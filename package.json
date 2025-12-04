@@ -1,5 +1,5 @@
 {
-  "name": "rof-database-client",
+  "name": "lumabase",
   "version": "1.0.0",
   "main": "dist-electron/main.js",
   "scripts": {

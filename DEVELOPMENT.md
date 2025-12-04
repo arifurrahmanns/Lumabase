@@ -1,6 +1,6 @@
 # Developer Guide
 
-This document provides technical details on how to extend and scale the Rof Database Client.
+This document provides technical details on how to extend and scale the Lumabase.
 
 ## Architecture Overview
 
