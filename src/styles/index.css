@@ -1,0 +1,17 @@
+@import 'antd/dist/reset.css';
+@import 'react-tabulator/lib/styles.css';
+@import 'react-tabulator/lib/css/tabulator_midnight.min.css'; /* Dark theme for tabulator */
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #141414; /* Match AntD dark theme bg */
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
