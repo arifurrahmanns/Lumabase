@@ -50,6 +50,28 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
       setActiveTable(table);
   }, []);
 
+  // Ref to break dependency cycle for handleRowSave
+  const handleRowSaveRef = useRef<(row: any) => void>(() => {});
+
+  const handleRowSaveWrapper = useCallback((r: any) => handleRowSaveRef.current(r), []);
+
+  // Custom Hooks - Called FIRST to get structure
+  const { 
+      tableData, 
+      columns, 
+      loading: dataLoading, 
+      refresh, 
+      loadTableData,
+      setTableData,
+      setColumns,
+      structure
+  } = useTableData(connectionId, activeTable, handleNavigate, handleRowSaveWrapper);
+
+  // Sync Ref with state (must do this early for useBatchEditor to use fresh data if it used ref, but it uses callback)
+  useEffect(() => {
+    tableDataRef.current = tableData;
+  }, [tableData]);
+
   const { 
       pendingChanges, 
       logs, 
@@ -58,10 +80,11 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
       setLogViewerVisible, 
       saving, 
       handleFieldChange, 
-      handleSave 
+      handleSave,
+      reset
   } = useBatchEditor(connectionId, activeTable, () => tableDataRef.current, () => {
       loadTableData();
-  });
+  }, structure, setTableData);
 
   // Now handleRowSave can use ref, so it doesn't need tableData in dependency
   const handleRowSave = useCallback((newRow: any) => {
@@ -86,24 +109,13 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
         }
         return newData;
     });
-  }, [handleFieldChange]);
+  }, [handleFieldChange, setTableData]);
 
-  // Custom Hooks
-  const { 
-      tableData, 
-      columns, 
-      loading: dataLoading, 
-      refresh, 
-      loadTableData,
-      setTableData,
-      setColumns,
-      structure
-  } = useTableData(connectionId, activeTable, handleNavigate, handleRowSave);
-
-  // Sync Ref with state
+  // Update the ref so useTableData calls this logic
   useEffect(() => {
-    tableDataRef.current = tableData;
-  }, [tableData]);
+      handleRowSaveRef.current = handleRowSave;
+  }, [handleRowSave]);
+
 
   // Load tables and dbs on mount or connection change
   useEffect(() => {
@@ -116,15 +128,20 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
     return () => clearTimeout(timer);
   }, [connectionId]);
 
-  useImperativeHandle(ref, () => ({
-      refresh: () => {
-          if (activeTable) {
-              refresh(); 
-          } else {
-              loadTables(); 
-              loadDatabases();
-          }
+  // Handle manual refresh
+  const handleRefresh = useCallback(() => {
+      // Use the ref passed from useBatchEditor or parent
+      if (activeTable) {
+        refresh();
+        reset(); 
+      } else {
+        loadTables();
+        loadDatabases();
       }
+  }, [activeTable, refresh, reset]);
+
+  useImperativeHandle(ref, () => ({
+      refresh: handleRefresh
   }));
 
   const handleResize = (index: number) => (_: any, { size }: any) => {
@@ -462,7 +479,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
               <div style={{ padding: '8px 16px', background: 'var(--card)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
                 <Space>
                     <Button icon={<PlusOutlined />} onClick={handleAddRow}>Add Row</Button>
-                    <Button icon={<ReloadOutlined />} onClick={refresh}>Refresh</Button>
+                    <Button icon={<ReloadOutlined />} onClick={handleRefresh}>Refresh</Button>
                     <Button icon={<EditOutlined />} onClick={() => setIsStructureModalVisible(true)}>Structure</Button>
                     {pendingFilter && <Button onClick={clearFilter}>Clear Filter</Button>}
                 </Space>
