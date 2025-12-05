@@ -12,9 +12,11 @@ import { ipc } from '../renderer/ipc';
 
 interface TitleBarProps {
     onAddTab?: () => void;
+    onRefresh?: () => void;
+    refreshDisabled?: boolean;
 }
 
-const TitleBar: React.FC<TitleBarProps> = ({ onAddTab }) => {
+const TitleBar: React.FC<TitleBarProps> = ({ onAddTab, onRefresh, refreshDisabled }) => {
     // const { token } = theme.useToken(); // Unused for now
 
     return (
@@ -32,7 +34,14 @@ const TitleBar: React.FC<TitleBarProps> = ({ onAddTab }) => {
             {/* Left Actions */}
             <Space style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
                 <Button type="text" size="small" icon={<QuestionCircleOutlined />} style={{ color: '#aaa' }} />
-                <Button type="text" size="small" icon={<ReloadOutlined />} style={{ color: '#aaa' }} onClick={() => window.location.reload()} />
+                <Button 
+                    type="text" 
+                    size="small" 
+                    icon={<ReloadOutlined />} 
+                    style={{ color: '#aaa' }} 
+                    onClick={onRefresh}
+                    disabled={refreshDisabled}
+                />
                 <Button type="text" size="small" icon={<PlusOutlined />} style={{ color: '#aaa' }} onClick={onAddTab} />
             </Space>
 

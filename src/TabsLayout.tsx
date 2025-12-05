@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Layout, Tabs, Space } from 'antd';
 import { DatabaseOutlined, HomeOutlined } from '@ant-design/icons';
 import EngineManagerScreen from './screens/EngineManagerScreen';
@@ -19,6 +19,7 @@ const TabsLayout: React.FC = () => {
   const [tabs, setTabs] = useState<Tab[]>([
     { key: 'home', label: 'Engines', type: 'engine-manager', closable: false }
   ]);
+  const tabRefs = useRef<Record<string, { refresh: () => void }>>({});
 
   const handleConnect = (connectionId: string, engineName: string) => {
     const newKey = `tab-${Date.now()}`;
@@ -60,13 +61,28 @@ const TabsLayout: React.FC = () => {
       const { key } = newTabs[targetIndex === newTabs.length ? targetIndex - 1 : targetIndex];
       setActiveKey(key);
     }
+
     setTabs(newTabs);
+    // Remove ref
+    if (tabRefs.current[targetKey]) {
+        delete tabRefs.current[targetKey];
+    }
     // TODO: Ideally close connection on backend too
   };
 
+  const handleRefresh = () => {
+      const activeRef = tabRefs.current[activeKey];
+      if (activeRef) {
+          activeRef.refresh();
+      }
+  };
+
+  const activeTab = tabs.find(t => t.key === activeKey);
+  const isRefreshable = activeTab?.type === 'engine-manager' || activeTab?.type === 'explorer';
+
   return (
     <Layout style={{ height: '100vh', overflow: 'hidden' }}>
-      <TitleBar onAddTab={handleAddTab} />
+      <TitleBar onAddTab={handleAddTab} onRefresh={handleRefresh} refreshDisabled={!isRefreshable} />
       <Tabs
         type="editable-card"
         activeKey={activeKey}
@@ -83,9 +99,15 @@ const TabsLayout: React.FC = () => {
           ),
           closable: tab.closable,
           children: tab.type === 'engine-manager' ? (
-            <EngineManagerScreen onConnect={(connectionId, engineName) => handleConnect(connectionId, engineName)} />
+            <EngineManagerScreen 
+                ref={(el) => { if (el) tabRefs.current[tab.key] = el; }}
+                onConnect={(connectionId, engineName) => handleConnect(connectionId, engineName)} 
+            />
           ) : (
-            <ExplorerScreen connectionId={tab.connectionId!} />
+            <ExplorerScreen 
+                ref={(el) => { if (el) tabRefs.current[tab.key] = el; }}
+                connectionId={tab.connectionId!} 
+            />
           )
         }))}
         style={{ height: 'calc(100% - 32px)' }}

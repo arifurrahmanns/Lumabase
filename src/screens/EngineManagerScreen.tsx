@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { Layout, Table, Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Progress } from 'antd';
 import { PlusOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons';
 import { ipc } from '../renderer/ipc';
@@ -21,7 +21,11 @@ interface EngineManagerScreenProps {
     onConnect?: (connectionId: string, engineName: string) => void;
 }
 
-const EngineManagerScreen: React.FC<EngineManagerScreenProps> = ({ onConnect }) => {
+interface EngineManagerScreenRef {
+    refresh: () => void;
+}
+
+const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScreenProps>(({ onConnect }, ref) => {
   const [instances, setInstances] = useState<EngineInstance[]>([]);
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -42,6 +46,10 @@ const EngineManagerScreen: React.FC<EngineManagerScreenProps> = ({ onConnect }) 
       setLoading(false);
     }
   };
+
+  useImperativeHandle(ref, () => ({
+    refresh: loadInstances
+  }));
 
   useEffect(() => {
     loadInstances();
@@ -356,6 +364,6 @@ const EngineManagerScreen: React.FC<EngineManagerScreenProps> = ({ onConnect }) 
       </Content>
     </Layout>
   );
-};
+});
 
 export default EngineManagerScreen;

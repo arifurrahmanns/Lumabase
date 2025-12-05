@@ -21,7 +21,8 @@
       "output": "release/${version}"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "public/app-icon.png"
     },
     "nsis": {
       "oneClick": false,

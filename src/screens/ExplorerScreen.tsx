@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Layout, Menu, Button, Space, Empty, message, Select, Modal, Form, Input, Table, Dropdown } from 'antd';
 import { PlusOutlined, ReloadOutlined, EditOutlined, TableOutlined, CodeOutlined, DeleteOutlined, DatabaseOutlined } from '@ant-design/icons';
 import { ipc } from '../renderer/ipc';
@@ -20,7 +20,11 @@ interface ExplorerScreenProps {
     connectionId: string;
 }
 
-const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
+interface ExplorerScreenRef {
+    refresh: () => void;
+}
+
+const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ connectionId }, ref) => {
   const [tables, setTables] = useState<string[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const [activeTable, setActiveTable] = useState<string | null>(null);
@@ -100,6 +104,16 @@ const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
     loadTables();
     loadDatabases();
   }, [connectionId]);
+
+  useImperativeHandle(ref, () => ({
+      refresh: () => {
+          if (activeTable) {
+              refresh(); // from useTableData
+          } else {
+              loadTables(); // Reload tables list if no table active
+          }
+      }
+  }));
 
   // Handle Resize using ref for columns if needed, or just functional update?
   // We need to update columns which comes from useTableData. 
@@ -477,6 +491,6 @@ const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
       />
     </Layout>
   );
-};
+});
 
 export default ExplorerScreen;
