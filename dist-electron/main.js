@@ -20601,6 +20601,8 @@ function createWindow() {
   win = new electron.BrowserWindow({
     width: 1200,
     height: 800,
+    minWidth: 1200,
+    minHeight: 700,
     icon: path$2.join(process.env.VITE_PUBLIC, "app-icon.png"),
     webPreferences: {
       preload: path$2.join(__dirname, "preload.js"),
@@ -20619,6 +20621,20 @@ function createWindow() {
     win.loadURL(VITE_DEV_SERVER_URL);
   } else {
     win.loadFile(path$2.join(process.env.DIST, "index.html"));
+  }
+  if (electron.app.isPackaged) {
+    win.removeMenu();
+    win.webContents.on("before-input-event", (event, input) => {
+      if (input.control && input.shift && (input.key.toLowerCase() === "i" || input.key.toLowerCase() === "j")) {
+        event.preventDefault();
+      }
+      if (input.meta && input.alt && (input.key.toLowerCase() === "i" || input.key.toLowerCase() === "j")) {
+        event.preventDefault();
+      }
+      if (input.key === "F12") {
+        event.preventDefault();
+      }
+    });
   }
 }
 electron.app.on("window-all-closed", () => {

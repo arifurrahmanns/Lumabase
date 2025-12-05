@@ -5,6 +5,7 @@ import { ipc } from '../renderer/ipc';
 export const useBatchEditor = (
     connectionId: string,
     activeTable: string | null,
+    getData: () => any[], // Access current table data
     onReload: () => void
 ) => {
     const [pendingChanges, setPendingChanges] = useState<Map<any, any>>(new Map());
@@ -12,14 +13,15 @@ export const useBatchEditor = (
     const [logViewerVisible, setLogViewerVisible] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    const handleFieldChange = useCallback((row: any, field: string, value: any) => {
-        const pk = 'id'; // Simplified: assuming 'id' is PK
+    const getRowId = (row: any) => row._tempKey || row.id;
 
-        if (row[pk] !== undefined) {
+    const handleFieldChange = useCallback((row: any, field: string, value: any) => {
+        const id = getRowId(row);
+        if (id !== undefined) {
              setPendingChanges(prev => {
                 const newMap = new Map(prev);
-                const existing = newMap.get(row[pk]) || {};
-                newMap.set(row[pk], { ...existing, [field]: value });
+                const existing = newMap.get(id) || {};
+                newMap.set(id, { ...existing, [field]: value });
                 return newMap;
             });
         }
@@ -32,7 +34,49 @@ export const useBatchEditor = (
         let hasError = false;
         const pk = 'id'; // Simplified
 
+        const currentRows = getData();
+        const newRows = currentRows.filter(r => r._isNew);
+        const processedIds = new Set();
+
+        // 1. Handle New Rows (INSERTS)
+        for (const row of newRows) {
+            const rowKey = getRowId(row); // _tempKey
+            processedIds.add(rowKey);
+            
+            const changes = pendingChanges.get(rowKey) || {};
+            const finalRow = { ...row, ...changes };
+            
+            // Clean up internal flags
+            delete finalRow._isNew;
+            delete finalRow._tempKey;
+            
+            // For insertions, we generally don't send the PK if it's null/undefined (AI)
+            // But if the user entered a value (changes.id exists), we send it.
+            // If explicit "id" is in row (from defaults) but it's empty string/0, we might strictly need to check structure.
+            // For now, if defaults put a value there, we send it. 
+            // BUT ExplorerScreen will be updated to NOT put a value for AI.
+
+            try {
+                await ipc.addRow(connectionId, activeTable, finalRow);
+                batchLogs.push({
+                    type: 'success',
+                    message: `Successfully added row`,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+            } catch (e: any) {
+                hasError = true;
+                batchLogs.push({
+                    type: 'error',
+                    message: `Failed to add row: ${e.message}`,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+            }
+        }
+
+        // 2. Handle Updates (UPDATES)
         for (const [pkValue, changes] of pendingChanges.entries()) {
+            if (processedIds.has(pkValue)) continue; // Already handled as insert
+
             try {
                 await ipc.updateRow(connectionId, activeTable, changes, pk, pkValue);
                 batchLogs.push({
@@ -64,7 +108,7 @@ export const useBatchEditor = (
         onReload();
         
         setSaving(false);
-    }, [activeTable, connectionId, pendingChanges, onReload]);
+    }, [activeTable, connectionId, pendingChanges, onReload, getData]);
 
     return {
         pendingChanges,

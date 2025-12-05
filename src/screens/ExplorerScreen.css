@@ -1,3 +1,17 @@
 .ant-table-body {
     overflow: auto !important;
 }
+
+.ant-pagination-item, 
+.ant-pagination-prev, 
+.ant-pagination-next, 
+.ant-pagination-jump-prev, 
+.ant-pagination-jump-next {
+    margin-right: 4px !important;
+}
+
+.ant-table-thead > tr > th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 100 !important;
+}

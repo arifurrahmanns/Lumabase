@@ -1,6 +1,10 @@
 {
   "name": "lumabase",
   "version": "1.0.1",
+  "author": {
+    "name": "Arif Ur Rahman",
+    "email": "arif@rootoverflow.com"
+  },
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -12,6 +16,7 @@
   "build": {
     "appId": "com.lumabase.app",
     "productName": "Lumabase",
+    "copyright": "Copyright © 2025 Arif Ur Rahman",
     "files": [
       "dist/**/*",
       "dist-electron/**/*",

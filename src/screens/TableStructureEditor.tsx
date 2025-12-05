@@ -225,6 +225,8 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
     {
       title: 'Actions',
       key: 'actions',
+      width: 70,
+      align: 'center' as const,
       render: (_: any, record: any) => {
         const editable = isEditing(record);
         return editable ? (

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Layout, Menu, Button, Space, Empty, message, Select, Modal, Form, Input, Table, Dropdown } from 'antd';
+import { Layout, Menu, Button, Space, Empty, message, Select, Modal, Form, Input, Table, Dropdown, Pagination } from 'antd';
 import { PlusOutlined, ReloadOutlined, EditOutlined, TableOutlined, CodeOutlined, DeleteOutlined, DatabaseOutlined } from '@ant-design/icons';
 import { ipc } from '../renderer/ipc';
 import TableStructureEditor from './TableStructureEditor';
@@ -26,12 +26,14 @@ interface ExplorerScreenRef {
 
 const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ connectionId }, ref) => {
   const [tables, setTables] = useState<string[]>([]);
-  const [modal, contextHolder] = Modal.useModal(); // Hook for themed modal
+  const [modal, contextHolder] = Modal.useModal();
   const [collapsed, setCollapsed] = useState(false);
   const [activeTable, setActiveTable] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'sql'>('table');
   const [isStructureModalVisible, setIsStructureModalVisible] = useState(false);
   const [pendingFilter, setPendingFilter] = useState<{ field: string; value: any } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [databases, setDatabases] = useState<string[]>([]);
   const [currentDb, setCurrentDb] = useState<string>('');
   const [isCreateDbModalVisible, setIsCreateDbModalVisible] = useState(false);
@@ -57,14 +59,15 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
       saving, 
       handleFieldChange, 
       handleSave 
-  } = useBatchEditor(connectionId, activeTable, () => {
+  } = useBatchEditor(connectionId, activeTable, () => tableDataRef.current, () => {
       loadTableData();
   });
 
   // Now handleRowSave can use ref, so it doesn't need tableData in dependency
   const handleRowSave = useCallback((newRow: any) => {
-    // Find the original row to detect changes from REF
-    const oldRow = tableDataRef.current.find((r: any) => r.id === newRow.id);
+    // Find the original row to detect changes from REF using robust key check
+    const getRowId = (r: any) => r._tempKey || r.id;
+    const oldRow = tableDataRef.current.find((r: any) => getRowId(r) === getRowId(newRow));
     if (!oldRow) return;
 
     Object.keys(newRow).forEach(key => {
@@ -76,14 +79,14 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
     // Optimistically update local data
     setTableData(prevData => {
         const newData = [...prevData];
-        const index = newData.findIndex((item) => item.id === newRow.id);
+        const index = newData.findIndex((item) => getRowId(item) === getRowId(newRow));
         if (index > -1) {
             const item = newData[index];
             newData.splice(index, 1, { ...item, ...newRow });
         }
         return newData;
     });
-  }, [handleFieldChange]); // No tableData dependency!
+  }, [handleFieldChange]);
 
   // Custom Hooks
   const { 
@@ -93,37 +96,38 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
       refresh, 
       loadTableData,
       setTableData,
-      setColumns
+      setColumns,
+      structure
   } = useTableData(connectionId, activeTable, handleNavigate, handleRowSave);
 
-  // Keep ref in sync
+  // Sync Ref with state
   useEffect(() => {
-      tableDataRef.current = tableData;
+    tableDataRef.current = tableData;
   }, [tableData]);
 
+  // Load tables and dbs on mount or connection change
   useEffect(() => {
     loadTables();
     loadDatabases();
+    // Retry once after 500ms to handle race conditions where connection might not be fully ready
+    const timer = setTimeout(() => {
+        loadDatabases();
+    }, 500);
+    return () => clearTimeout(timer);
   }, [connectionId]);
 
   useImperativeHandle(ref, () => ({
       refresh: () => {
           if (activeTable) {
-              refresh(); // from useTableData
+              refresh(); 
           } else {
-              loadTables(); // Reload tables list if no table active
+              loadTables(); 
+              loadDatabases();
           }
       }
   }));
 
-  // Handle Resize using ref for columns if needed, or just functional update?
-  // We need to update columns which comes from useTableData. 
-  // useTableData returns setColumns now.
   const handleResize = (index: number) => (_: any, { size }: any) => {
-       // We access setColumns from the hook result.
-       // But wait, setColumns is returned from useTableData but it is not in scope here inside handleResize definition 
-       // unless we define handleResize inside the component body (which it is).
-       // BUT columns is also from hook.
        setColumns((prevColumns: any[]) => {
            const nextColumns = [...prevColumns];
            nextColumns[index] = {
@@ -134,11 +138,20 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
        });
   };
 
-  // Filter application logic 
   const filteredData = React.useMemo(() => {
      if (!pendingFilter) return tableData;
      return tableData.filter(item => item[pendingFilter.field] == pendingFilter.value);
   }, [tableData, pendingFilter]);
+
+  const paginatedData = React.useMemo(() => {
+      const start = (currentPage - 1) * pageSize;
+      const end = start + pageSize;
+      return filteredData.slice(start, end);
+  }, [filteredData, currentPage, pageSize]);
+
+  useEffect(() => {
+      setCurrentPage(1);
+  }, [pendingFilter, activeTable]);
 
   useEffect(() => {
        if (pendingFilter) {
@@ -153,7 +166,6 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
       const list = await ipc.listTables(connectionId);
       setTables(list);
     } catch (error) {
-      message.error('Failed to load tables');
     }
   };
 
@@ -216,15 +228,44 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
   const handleAddRow = async () => {
       if (!activeTable) return;
       try {
-          await ipc.addRow(connectionId, activeTable, {});
-          loadTableData();
-          message.success('Row added');
-      } catch (e) {
-          message.error('Failed to add row');
+          // Construct default row
+          const defaultRow: any = {};
+          if (structure && structure.length > 0) {
+            structure.forEach((col: any) => {
+                // SKIP Auto-Increment and Defaults for ID
+                if (col.autoIncrement) {
+                    return; // Leave undefined
+                }
+                
+                if (col.notnull && col.dflt_value === null) {
+                    if (col.type.includes('INT') || col.type.includes('DECIMAL') || col.type.includes('FLOAT') || col.type.includes('DOUBLE')) {
+                        defaultRow[col.name] = 0;
+                    } else if (col.type.includes('CHAR') || col.type.includes('TEXT')) {
+                        defaultRow[col.name] = '';
+                    } else if (col.type.includes('DATE') || col.type.includes('TIME')) {
+                        defaultRow[col.name] = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                    } else {
+                        defaultRow[col.name] = ''; 
+                    }
+                }
+            });
+          }
+
+          // Generate Metadata
+          defaultRow._tempKey = `new_${Date.now()}`;
+          defaultRow._isNew = true;
+
+          console.log('Adding local row:', defaultRow);
+          // Add to local state only
+          setTableData(prev => [defaultRow, ...prev]);
+          
+          message.info('Row added manually. Click Save to persist.');
+      } catch (e: any) {
+          console.error(e);
+          message.error(`Failed to add row: ${e.message || e}`);
       }
   };
 
-  // Merge columns with resize handler and Delete button
   const mergedColumns = columns.map((col, index) => ({
       ...col,
       onHeaderCell: (column: any) => ({
@@ -233,11 +274,11 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
       }),
   }));
 
-  // Add Actions column
   const actionColumn = {
       title: 'Actions',
       key: 'actions',
-      width: 100,
+      width: 70,
+      align: 'center' as const,
       render: (_: any, record: any) => (
           <Button 
             type="text" 
@@ -245,16 +286,24 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
             icon={<DeleteOutlined />} 
             onClick={(e) => {
                 e.stopPropagation();
+                // If it's a new unsaved row, just remove from state
+                if (record._isNew) {
+                    const getRowId = (r: any) => r._tempKey || r.id;
+                    setTableData(prev => prev.filter(r => getRowId(r) !== getRowId(record)));
+                    message.success('Removed unsaved row');
+                    return;
+                }
+
                 modal.confirm({
                     title: 'Delete this row?',
                     content: 'This action cannot be undone.',
                     okText: 'Delete',
                     okType: 'danger',
                     onOk: async () => {
-                        const pk = 'id'; // Simplified
+                        const pk = 'id'; 
                         if (record[pk]) {
                             await ipc.deleteRow(connectionId, activeTable!, pk, record[pk]);
-                            loadTableData(); // Reload or splice locally
+                            loadTableData(); 
                             message.success('Deleted');
                         }
                     }
@@ -297,6 +346,12 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
                                     onClick: () => handleDatabaseChange(db)
                                 })),
                                 { type: 'divider' },
+                                {
+                                    key: 'refresh-dbs',
+                                    icon: <ReloadOutlined />,
+                                    label: 'Refresh List',
+                                    onClick: () => loadDatabases()
+                                },
                                 {
                                     key: 'new-db',
                                     icon: <PlusOutlined />,
@@ -399,7 +454,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
         </div>
       </Sider>
       <Layout>
-        <Content style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
+        <Content style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: 'var(--background)' }}>
           {viewMode === 'sql' ? (
               <SqlEditor connectionId={connectionId} />
           ) : activeTable ? (
@@ -416,15 +471,14 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
               <div style={{ flex: 1, overflow: 'auto' }}>
                 <Table
                   bordered
-                  dataSource={filteredData}
+                  dataSource={paginatedData}
                   columns={gridColumns}
                   components={{
                       header: { cell: ResizableTitle },
                       body: { cell: EditableCell }
                   }}
-                  rowKey="id"
-                  pagination={{ pageSize: 50 }}
-                  scroll={{ y: 'calc(100vh - 200px)' }}
+                  rowKey={(r) => r._tempKey || r.id}
+                  pagination={false}
                   size="small"
                 />
               </div>
@@ -439,19 +493,36 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
         </Content>
         <Footer style={{ padding: '8px 16px', background: 'var(--sidebar)', color: 'var(--muted-foreground)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{activeTable ? `Connected: ${activeTable}` : 'Ready'}</span>
-            <Space>
-                <Button onClick={() => setLogViewerVisible(true)}>Logs</Button>
-                {activeTable && (
-                    <Button 
-                        type="primary" 
-                        onClick={handleSave} 
-                        disabled={pendingChanges.size === 0}
-                        loading={saving || dataLoading}
-                    >
-                        Save ({pendingChanges.size})
-                    </Button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                 {activeTable && (
+                    <Pagination 
+                        current={currentPage}
+                        pageSize={pageSize}
+                        total={filteredData.length}
+                        onChange={(page, size) => {
+                            setCurrentPage(page);
+                            setPageSize(size);
+                        }}
+                        size="small"
+                        showSizeChanger
+                        showQuickJumper
+                        showTotal={(total) => `Total ${total}`}
+                    />
                 )}
-            </Space>
+                <Space>
+                    <Button onClick={() => setLogViewerVisible(true)}>Logs</Button>
+                    {activeTable && (
+                        <Button 
+                            type="primary" 
+                            onClick={handleSave} 
+                            disabled={pendingChanges.size === 0}
+                            loading={saving || dataLoading}
+                        >
+                            Save ({pendingChanges.size})
+                        </Button>
+                    )}
+                </Space>
+            </div>
         </Footer>
       </Layout>
       

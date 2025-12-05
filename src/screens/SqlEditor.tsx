@@ -102,9 +102,8 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ connectionId, initialQuery = '' }
                 dataSource={results} 
                 columns={columns} 
                 rowKey={(_, index) => index!.toString()} 
-                pagination={{ pageSize: 50 }} 
+                pagination={{ pageSize: 50, hideOnSinglePage: true }} 
                 size="small"
-                scroll={{ y: 'calc(100vh - 400px)' }} // Adjust scroll height considering editor height
                 locale={{ emptyText: 'No results' }}
             />
         </div>

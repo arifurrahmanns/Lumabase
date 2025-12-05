@@ -10,6 +10,7 @@ interface EditableCellProps {
   handleSave: (record: any) => void;
   inputType?: 'text' | 'select';
   selectOptions?: { value: any; label: string }[];
+  forceEdit?: boolean;
 }
 
 export const EditableCell: React.FC<EditableCellProps> = ({
@@ -21,14 +22,24 @@ export const EditableCell: React.FC<EditableCellProps> = ({
   handleSave,
   inputType = 'text',
   selectOptions = [],
+  forceEdit = false,
   ...restProps
 }) => {
-  const [editing, setEditing] = useState(false);
-  // Initialize with record value. If record changes, this might need update, 
-  // but usually we rely on editing state toggle to refresh.
+  const [editing, setEditing] = useState(forceEdit);
+  // Initialize with record value.
   const [value, setValue] = useState(record ? record[dataIndex] : undefined);
   
   const inputRef = useRef<any>(null);
+
+  useEffect(() => {
+      setValue(record ? record[dataIndex] : undefined);
+  }, [record, dataIndex]);
+
+  useEffect(() => {
+    if (forceEdit) {
+        setEditing(true);
+    }
+  }, [forceEdit]);
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -37,6 +48,7 @@ export const EditableCell: React.FC<EditableCellProps> = ({
   }, [editing]);
 
   const toggleEdit = () => {
+    if (forceEdit) return;
     setEditing(!editing);
     if (!editing && record) {
         // When entering edit mode, ensure we have the latest value
@@ -45,9 +57,10 @@ export const EditableCell: React.FC<EditableCellProps> = ({
   };
 
   const save = () => {
-    toggleEdit();
-    // Only save if value changed? 
-    // handleSave logic in ExplorerScreen checks equality, so safe to call always.
+    if (!forceEdit) {
+        setEditing(false); // Only toggle off if not forced
+    }
+    
     if (record) {
         handleSave({ ...record, [dataIndex]: value });
     }
@@ -72,7 +85,7 @@ export const EditableCell: React.FC<EditableCellProps> = ({
              onChange={handleChange}
              onBlur={save}
              options={selectOptions}
-             defaultOpen={true}
+             defaultOpen={!forceEdit} // Don't auto-open if forced (would be annoying)
              autoFocus
              style={{ width: '100%', margin: 0 }}
            />

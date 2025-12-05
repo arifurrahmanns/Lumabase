@@ -78,6 +78,8 @@ const UserManagementModal: React.FC<Props> = ({ visible, onCancel, connectionId 
     {
       title: 'Actions',
       key: 'actions',
+      width: 70,
+      align: 'center' as const,
       render: (_: any, record: any) => (
         <Space>
             <Button 

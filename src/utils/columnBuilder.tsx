@@ -64,7 +64,8 @@ export const buildColumns = async (
             title: col.name,
             handleSave,
             inputType,
-            selectOptions
+            selectOptions,
+            forceEdit: record._isNew // Force edit mode if row is new
         });
         
         return baseCol;

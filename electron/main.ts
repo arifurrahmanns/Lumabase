@@ -16,6 +16,8 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1200,
     height: 800,
+    minWidth: 1200,
+    minHeight: 700,
     icon: path.join(process.env.VITE_PUBLIC, 'app-icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -36,6 +38,25 @@ function createWindow() {
   } else {
     // win.loadFile('dist/index.html')
     win.loadFile(path.join(process.env.DIST, 'index.html'))
+  }
+
+  // Disable DevTools in production
+  if (app.isPackaged) {
+    win.removeMenu();
+    win.webContents.on('before-input-event', (event, input) => {
+      // Windows/Linux: Ctrl+Shift+I, Ctrl+Shift+J
+      if (input.control && input.shift && (input.key.toLowerCase() === 'i' || input.key.toLowerCase() === 'j')) {
+        event.preventDefault();
+      }
+      // macOS: Cmd+Option+I, Cmd+Option+J
+      if (input.meta && input.alt && (input.key.toLowerCase() === 'i' || input.key.toLowerCase() === 'j')) {
+          event.preventDefault();
+      }
+      // F12
+      if (input.key === 'F12') {
+        event.preventDefault();
+      }
+    });
   }
 }
 

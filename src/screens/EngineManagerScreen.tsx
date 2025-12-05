@@ -1,5 +1,5 @@
 import { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
-import { Layout, Table, Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Progress } from 'antd';
+import { Layout, Table, Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Progress, Tooltip } from 'antd';
 import { PlusOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons';
 import { ipc } from '../renderer/ipc';
 
@@ -246,44 +246,46 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
     {
       title: 'Actions',
       key: 'actions',
+      width: 70,
+      align: 'center' as const,
       render: (_: any, record: EngineInstance) => (
         <Space>
           {record.status === 'running' ? (
             <>
-                <Button 
-                  icon={<ExportOutlined />} 
-                  type="primary"
-                  onClick={() => handleOpen(record)}
-                >
-                  Open
-                </Button>
-                <Button 
-                  icon={<PauseCircleOutlined />} 
-                  type="primary"
-                  danger 
-                  onClick={() => handleStop(record.id)}
-                >
-                  Stop
-                </Button>
+                <Tooltip title="Open">
+                    <Button 
+                      icon={<ExportOutlined />} 
+                      type="primary"
+                      onClick={() => handleOpen(record)}
+                    />
+                </Tooltip>
+                <Tooltip title="Stop">
+                    <Button 
+                      icon={<PauseCircleOutlined />} 
+                      type="primary"
+                      danger 
+                      onClick={() => handleStop(record.id)}
+                    />
+                </Tooltip>
             </>
           ) : (
-            <Button 
-              icon={<PlayCircleOutlined />} 
-              type="primary" 
-              onClick={() => handleStart(record.id)}
-              disabled={record.status === 'starting'}
-            >
-              Start
-            </Button>
+            <Tooltip title="Start">
+                <Button 
+                  icon={<PlayCircleOutlined />} 
+                  type="primary" 
+                  onClick={() => handleStart(record.id)}
+                  disabled={record.status === 'starting'}
+                />
+            </Tooltip>
           )}
-          <Button 
-            icon={<DeleteOutlined />} 
-            onClick={() => handleRemove(record.id)}
-            disabled={record.status === 'running'}
-            style={{ color: 'var(--foreground)', borderColor: 'var(--foreground)' }}
-          >
-            Remove
-          </Button>
+          <Tooltip title="Remove">
+              <Button 
+                icon={<DeleteOutlined />} 
+                onClick={() => handleRemove(record.id)}
+                disabled={record.status === 'running'}
+                style={{ color: 'var(--foreground)', borderColor: 'var(--foreground)' }}
+              />
+          </Tooltip>
         </Space>
       ),
     },
@@ -308,6 +310,7 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
           dataSource={instances} 
           rowKey="id" 
           loading={loading}
+          pagination={{ hideOnSinglePage: true }}
         />
 
         <Modal
