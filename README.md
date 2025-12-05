@@ -11,13 +11,14 @@
 
 ## ✨ Features
 
+- 🏗️ **Database Engine Manager**: Automatically download, install, and manage local MySQL and PostgreSQL instances directly within the app.
 - 🔌 **Multi-Database Support**: Connect effortlessly to MySQL and PostgreSQL.
 - 📊 **Table Explorer**: View and edit data with a powerful, specialized Ant Design Table interface.
 - 🛠️ **Structure Editor**: Visually modify table schemas, manage columns, and data types.
 - 🔗 **Foreign Key Manager**: Intuitive visual editor for managing foreign key constraints.
 - 📝 **SQL Editor**: Execute queries with a full-featured code editor (CodeMirror) supporting syntax highlighting and auto-completion.
 - 💾 **Batch Editing**: Make multiple changes and save them in a single transaction.
-- 🌑 **Dark Mode**: A sleek, dark-themed interface designed for developer comfort.
+- 🖥️ **Custom UI**: Frameless window with a custom designed title bar, context-aware refresh, and dark-themed interface.
 
 ## 🛠️ Tech Stack
 
