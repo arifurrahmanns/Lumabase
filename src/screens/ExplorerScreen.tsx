@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Layout, Menu, Button, Space, Empty, message, Select, Modal, Form, Input, Table } from 'antd';
-import { PlusOutlined, ReloadOutlined, EditOutlined, TableOutlined, CodeOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Layout, Menu, Button, Space, Empty, message, Select, Modal, Form, Input, Table, Dropdown } from 'antd';
+import { PlusOutlined, ReloadOutlined, EditOutlined, TableOutlined, CodeOutlined, DeleteOutlined, DatabaseOutlined } from '@ant-design/icons';
 import { ipc } from '../renderer/ipc';
 import TableStructureEditor from './TableStructureEditor';
 import CreateTableModal from './CreateTableModal';
@@ -22,6 +22,7 @@ interface ExplorerScreenProps {
 
 const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
   const [tables, setTables] = useState<string[]>([]);
+  const [collapsed, setCollapsed] = useState(false);
   const [activeTable, setActiveTable] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'sql'>('table');
   const [isStructureModalVisible, setIsStructureModalVisible] = useState(false);
@@ -238,53 +239,98 @@ const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
 
   return (
     <Layout style={{ height: '100%' }}>
-      <Sider theme="dark" collapsible width={250} style={{ borderRight: '1px solid var(--border)', minHeight: '100%', overflow: 'hidden' }}>
+      <Sider 
+        theme="dark" 
+        collapsible 
+
+        collapsed={collapsed}
+        onCollapse={(value) => setCollapsed(value)}
+        width={250} 
+        style={{ borderRight: '1px solid var(--border)', minHeight: '100%', overflow: 'hidden' }}
+      >
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           <div className="sidebar-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
           <div style={{ padding: 16 }}>
-            <Select 
-                style={{ width: '100%', marginBottom: 8 }} 
-                placeholder="Select Database"
-                value={currentDb || undefined}
-                onChange={handleDatabaseChange}
-                dropdownRender={menu => (
-                    <>
-                        {menu}
-                        <Button type="text" block icon={<PlusOutlined />} onClick={() => setIsCreateDbModalVisible(true)}>
-                            New Database
-                        </Button>
-                        <Button type="text" block icon={<EditOutlined />} onClick={() => setIsUserModalVisible(true)}>
-                            Manage Users
-                        </Button>
-                    </>
-                )}
-            >
-                {databases.length === 0 ? (
-                     <Select.Option key="no-db" value="no-db" disabled>
-                        <div style={{ padding: '8px 0', textAlign: 'center', color: '#888' }}>
-                            No databases found
-                        </div>
-                     </Select.Option>
-                ) : (
-                    databases.map(db => (
-                        <Select.Option key={db} value={db}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>{db}</span>
-                                <Button 
-                                    type="text" 
-                                    size="small" 
-                                    icon={<DeleteOutlined />} 
-                                    danger
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDropDatabase(db);
-                                    }}
-                                />
+            {collapsed ? (
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                    <Dropdown 
+                        menu={{ 
+                            items: [
+                                ...databases.map(db => ({
+                                    key: db,
+                                    label: (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minWidth: 150 }}>
+                                            <span>{db}</span>
+                                            {currentDb === db && <span style={{ fontSize: 12, color: 'var(--primary)' }}> (Active)</span>}
+                                        </div>
+                                    ),
+                                    onClick: () => handleDatabaseChange(db)
+                                })),
+                                { type: 'divider' },
+                                {
+                                    key: 'new-db',
+                                    icon: <PlusOutlined />,
+                                    label: 'New Database',
+                                    onClick: () => setIsCreateDbModalVisible(true)
+                                },
+                                {
+                                    key: 'manage-users',
+                                    icon: <EditOutlined />,
+                                    label: 'Manage Users',
+                                    onClick: () => setIsUserModalVisible(true)
+                                }
+                            ]
+                        }} 
+                        trigger={['click']}
+                    >
+                         <Button type="text" icon={<DatabaseOutlined />} title={currentDb || "Select Database"} />
+                    </Dropdown>
+                </div>
+            ) : (
+                <Select 
+                    style={{ width: '100%', marginBottom: 8 }} 
+                    placeholder="Select Database"
+                    value={currentDb || undefined}
+                    onChange={handleDatabaseChange}
+                    dropdownRender={menu => (
+                        <>
+                            {menu}
+                            <Button type="text" block icon={<PlusOutlined />} onClick={() => setIsCreateDbModalVisible(true)}>
+                                New Database
+                            </Button>
+                            <Button type="text" block icon={<EditOutlined />} onClick={() => setIsUserModalVisible(true)}>
+                                Manage Users
+                            </Button>
+                        </>
+                    )}
+                >
+                    {databases.length === 0 ? (
+                         <Select.Option key="no-db" value="no-db" disabled>
+                            <div style={{ padding: '8px 0', textAlign: 'center', color: '#888' }}>
+                                No databases found
                             </div>
-                        </Select.Option>
-                    ))
-                )}
-            </Select>
+                         </Select.Option>
+                    ) : (
+                        databases.map(db => (
+                            <Select.Option key={db} value={db}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span>{db}</span>
+                                    <Button 
+                                        type="text" 
+                                        size="small" 
+                                        icon={<DeleteOutlined />} 
+                                        danger
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDropDatabase(db);
+                                        }}
+                                    />
+                                </div>
+                            </Select.Option>
+                        ))
+                    )}
+                </Select>
+            )}
         </div>
         <div style={{ padding: '0 16px', color: '#888', fontSize: '12px', fontWeight: 'bold' }}>TABLES</div>
         <Menu
@@ -303,13 +349,22 @@ const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
               }
           }}
           items={[
-              { key: 'sql-editor', icon: <CodeOutlined />, label: 'SQL Editor', style: { marginBottom: 16, borderBottom: '1px solid #303030' } },
+              { key: 'sql-editor', icon: <CodeOutlined />, label: 'SQL Editor', style: { marginBottom: 8 } },
+              { type: 'divider' },
               ...tables.map(t => ({ key: t, icon: <TableOutlined />, label: t }))
           ]}
         />
           </div>
-          <div style={{ padding: 16, borderTop: '1px solid var(--border)' }}>
-              <Button type="dashed" block icon={<PlusOutlined />} onClick={() => setIsCreateTableModalVisible(true)}>New Table</Button>
+          <div style={{ padding: 16, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'center' }}>
+              <Button 
+                type="dashed" 
+                block={!collapsed} 
+                icon={<PlusOutlined />} 
+                onClick={() => setIsCreateTableModalVisible(true)}
+                title={collapsed ? "New Table" : undefined}
+              >
+                {!collapsed && "New Table"}
+              </Button>
           </div>
         </div>
       </Sider>

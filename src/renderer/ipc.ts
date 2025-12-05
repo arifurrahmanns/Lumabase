@@ -30,6 +30,11 @@ export const ipc = {
   stopEngine: (id: string) => window.electron.ipcRenderer.invoke('engine-stop', id),
   getDefaultEnginePaths: () => window.electron.ipcRenderer.invoke('get-default-engine-paths'),
   onDownloadProgress: (callback: (percent: number) => void) => window.electron.ipcRenderer.on('engine-download-progress', (_, percent) => callback(percent)),
+  
+  // Window Controls
+  minimizeWindow: () => window.electron.ipcRenderer.invoke('window-minimize'),
+  maximizeWindow: () => window.electron.ipcRenderer.invoke('window-maximize'),
+  closeWindow: () => window.electron.ipcRenderer.invoke('window-close'),
 };
 
 // Type definition for window.electron

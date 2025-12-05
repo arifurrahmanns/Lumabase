@@ -16,12 +16,14 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1200,
     height: 800,
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    icon: path.join(process.env.VITE_PUBLIC, 'app-icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
     },
+    frame: false, // Frameless window
+    titleBarStyle: 'hidden', // Hide title bar but keep traffic lights on macOS if needed, though frame: false usually hides everything on Windows
   })
 
   // Test active push message to Renderer-process.
@@ -184,5 +186,22 @@ app.whenReady().then(() => {
       base: enginesPath,
       platform: process.platform
     };
+  });
+
+  // Window Controls
+  ipcMain.handle('window-minimize', () => {
+    win?.minimize();
+  });
+  
+  ipcMain.handle('window-maximize', () => {
+    if (win?.isMaximized()) {
+      win.unmaximize();
+    } else {
+      win?.maximize();
+    }
+  });
+  
+  ipcMain.handle('window-close', () => {
+    win?.close();
   });
 })

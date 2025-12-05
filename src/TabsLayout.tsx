@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Layout, Tabs } from 'antd';
+import { Layout, Tabs, Space } from 'antd';
 import { DatabaseOutlined, HomeOutlined } from '@ant-design/icons';
 import EngineManagerScreen from './screens/EngineManagerScreen';
 import ExplorerScreen from './screens/ExplorerScreen';
+import TitleBar from './components/TitleBar';
 
 interface Tab {
   key: string;
@@ -33,6 +34,19 @@ const TabsLayout: React.FC = () => {
     setActiveKey(newKey);
   };
 
+  const handleAddTab = () => {
+    // For now, adding a tab opens the Engine Manager
+    const newKey = `new-tab-${Date.now()}`;
+    const newTab: Tab = {
+        key: newKey,
+        label: 'New Tab',
+        type: 'engine-manager',
+        closable: true
+    };
+    setTabs([...tabs, newTab]);
+    setActiveKey(newKey);
+  };
+
   const onEdit = (targetKey: any, action: 'add' | 'remove') => {
     if (action === 'remove') {
       removeTab(targetKey);
@@ -51,20 +65,21 @@ const TabsLayout: React.FC = () => {
   };
 
   return (
-    <Layout style={{ height: '100vh' }}>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
+      <TitleBar onAddTab={handleAddTab} />
       <Tabs
         type="editable-card"
         activeKey={activeKey}
         onChange={setActiveKey}
         onEdit={onEdit}
-        hideAdd
+        hideAdd // Hiding default add button as we have one in TitleBar
         items={tabs.map(tab => ({
           key: tab.key,
           label: (
-            <span>
+            <Space>
               {tab.type === 'engine-manager' ? <HomeOutlined /> : <DatabaseOutlined />}
               {tab.label}
-            </span>
+            </Space>
           ),
           closable: tab.closable,
           children: tab.type === 'engine-manager' ? (
@@ -73,7 +88,7 @@ const TabsLayout: React.FC = () => {
             <ExplorerScreen connectionId={tab.connectionId!} />
           )
         }))}
-        style={{ height: '100%' }}
+        style={{ height: 'calc(100% - 32px)' }}
         tabBarStyle={{ margin: 0, paddingLeft: 16, paddingTop: 8, background: 'var(--sidebar)' }}
       />
     </Layout>
