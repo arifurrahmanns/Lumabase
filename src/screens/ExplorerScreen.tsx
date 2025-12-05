@@ -26,6 +26,7 @@ interface ExplorerScreenRef {
 
 const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ connectionId }, ref) => {
   const [tables, setTables] = useState<string[]>([]);
+  const [modal, contextHolder] = Modal.useModal(); // Hook for themed modal
   const [collapsed, setCollapsed] = useState(false);
   const [activeTable, setActiveTable] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'sql'>('table');
@@ -189,20 +190,27 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
       }
   };
 
-  const handleDropDatabase = async (dbName: string) => {
-      if (!window.confirm(`Are you sure you want to delete database "${dbName}"? This cannot be undone.`)) return;
-      try {
-          await ipc.dropDatabase(connectionId, dbName);
-          message.success(`Database ${dbName} deleted`);
-          if (currentDb === dbName) {
-              setCurrentDb('');
-              setTables([]);
-              setActiveTable(null);
+  const handleDropDatabase = (dbName: string) => {
+      modal.confirm({
+          title: `Delete database "${dbName}"?`,
+          content: 'This action cannot be undone.',
+          okText: 'Delete',
+          okType: 'danger',
+          onOk: async () => {
+              try {
+                  await ipc.dropDatabase(connectionId, dbName);
+                  message.success(`Database ${dbName} deleted`);
+                  if (currentDb === dbName) {
+                      setCurrentDb('');
+                      setTables([]);
+                      setActiveTable(null);
+                  }
+                  loadDatabases();
+              } catch (e: any) {
+                  message.error(`Failed to delete database: ${e.message}`);
+              }
           }
-          loadDatabases();
-      } catch (e: any) {
-          message.error(`Failed to delete database: ${e.message}`);
-      }
+      });
   };
 
   const handleAddRow = async () => {
@@ -235,15 +243,22 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
             type="text" 
             danger 
             icon={<DeleteOutlined />} 
-            onClick={async (e) => {
+            onClick={(e) => {
                 e.stopPropagation();
-                if (!window.confirm('Delete this row?')) return;
-                const pk = 'id'; // Simplified
-                if (record[pk]) {
-                    await ipc.deleteRow(connectionId, activeTable!, pk, record[pk]);
-                    loadTableData(); // Reload or splice locally
-                    message.success('Deleted');
-                }
+                modal.confirm({
+                    title: 'Delete this row?',
+                    content: 'This action cannot be undone.',
+                    okText: 'Delete',
+                    okType: 'danger',
+                    onOk: async () => {
+                        const pk = 'id'; // Simplified
+                        if (record[pk]) {
+                            await ipc.deleteRow(connectionId, activeTable!, pk, record[pk]);
+                            loadTableData(); // Reload or splice locally
+                            message.success('Deleted');
+                        }
+                    }
+                });
             }}
           />
       )
@@ -253,6 +268,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
 
   return (
     <Layout style={{ height: '100%' }}>
+      {contextHolder}
       <Sider 
         theme="dark" 
         collapsible 

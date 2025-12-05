@@ -28,6 +28,7 @@ interface EngineManagerScreenRef {
 const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScreenProps>(({ onConnect }, ref) => {
   const [instances, setInstances] = useState<EngineInstance[]>([]);
   const [loading, setLoading] = useState(false);
+  const [modal, contextHolder] = Modal.useModal(); // Hook for themed modal
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [defaultPaths, setDefaultPaths] = useState<{ base: string, platform: string } | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
@@ -170,14 +171,23 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
     }
   };
 
-  const handleRemove = async (id: string) => {
-    try {
-      await ipc.removeEngine(id);
-      message.success('Engine removed');
-      loadInstances();
-    } catch (error) {
-      message.error('Failed to remove engine');
-    }
+  const handleRemove = (id: string) => {
+    modal.confirm({
+      title: 'Are you sure you want to remove this engine?',
+      content: 'This will delete the engine instance and ALL its data. This action cannot be undone.',
+      okText: 'Yes, Remove',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await ipc.removeEngine(id);
+          message.success('Engine removed');
+          loadInstances();
+        } catch (error) {
+          message.error('Failed to remove engine');
+        }
+      }
+    });
   };
 
   const handleOpen = async (record: EngineInstance) => {
@@ -281,6 +291,7 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
 
   return (
     <Layout style={{ height: '100vh', padding: '24px' }}>
+      {contextHolder}
       <Content>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
           <h1>DB Engine Manager</h1>
