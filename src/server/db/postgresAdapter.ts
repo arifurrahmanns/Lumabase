@@ -2,6 +2,7 @@ import { Client } from 'pg';
 
 export class PostgresAdapter {
   private client: Client | null = null;
+  private config: any = null;
 
   async connect(config: any) {
     try {
@@ -13,6 +14,7 @@ export class PostgresAdapter {
         database: config.database,
       });
       await this.client.connect();
+      this.config = config;
       return { success: true };
     } catch (error: any) {
       console.error('Postgres Connection failed:', error);
@@ -174,5 +176,76 @@ export class PostgresAdapter {
     if (!this.client) throw new Error('Database not connected');
     const res = await this.client.query(query);
     return res.rows;
+  }
+
+  async listDatabases() {
+      if (!this.client) throw new Error('Database not connected');
+      const res = await this.client.query("SELECT datname FROM pg_database WHERE datistemplate = false AND datname != 'postgres'");
+      return res.rows.map(row => row.datname);
+  }
+
+  async createDatabase(name: string) {
+      if (!this.client) throw new Error('Database not connected');
+      await this.client.query(`CREATE DATABASE "${name}"`);
+      return { success: true };
+  }
+
+  async dropDatabase(name: string) {
+      if (!this.client) throw new Error('Database not connected');
+      await this.client.query(`DROP DATABASE "${name}"`);
+      return { success: true };
+  }
+
+  async switchDatabase(name: string) {
+      if (!this.client) throw new Error('Database not connected');
+      // Postgres requires reconnection to switch DB
+      await this.client.end();
+      this.client = new Client({
+          ...this.config,
+          database: name
+      });
+      await this.client.connect();
+      // Update config so subsequent reconnects use this DB? 
+      // Or just keep it transient. 
+      // Better to update config in memory
+      this.config.database = name;
+      return { success: true };
+  }
+
+  async listUsers() {
+      if (!this.client) throw new Error('Database not connected');
+      const res = await this.client.query('SELECT usename FROM pg_catalog.pg_user');
+      return res.rows.map(row => ({ username: row.usename, host: '%' })); // Postgres users are global usually
+  }
+
+  async createUser(user: any) {
+      if (!this.client) throw new Error('Database not connected');
+      const { username, password } = user;
+      // Parameterized queries for CREATE USER are tricky in PG, usually need manual escaping or specific utility
+      // For MVP, we'll use simple string interpolation but validate input strictly or use a library helper if available.
+      // PG doesn't support parameters in DDL.
+      // We should sanitize `username`.
+      if (!/^[a-zA-Z0-9_]+$/.test(username)) throw new Error('Invalid username');
+      
+      await this.client.query(`CREATE USER "${username}" WITH PASSWORD '${password}'`);
+      return { success: true };
+  }
+
+  async dropUser(username: string, host?: string) {
+      if (!this.client) throw new Error('Database not connected');
+      if (!/^[a-zA-Z0-9_]+$/.test(username)) throw new Error('Invalid username');
+      await this.client.query(`DROP USER "${username}"`);
+      return { success: true };
+  }
+
+  async updateUser(user: any) {
+      if (!this.client) throw new Error('Database not connected');
+      const { username, password } = user;
+      if (!/^[a-zA-Z0-9_]+$/.test(username)) throw new Error('Invalid username');
+      
+      if (password) {
+          await this.client.query(`ALTER USER "${username}" WITH PASSWORD '${password}'`);
+      }
+      return { success: true };
   }
 }

@@ -13,6 +13,14 @@ interface DatabaseAdapter {
   getTableStructure(tableName: string): Promise<any>;
   updateTableStructure(tableName: string, actions: any[]): Promise<any>;
   executeQuery(query: string): Promise<any>;
+  listDatabases(): Promise<string[]>;
+  createDatabase(name: string): Promise<any>;
+  dropDatabase(name: string): Promise<any>;
+  switchDatabase(name: string): Promise<any>;
+  listUsers(): Promise<any[]>;
+  createUser(user: any): Promise<any>;
+  dropUser(username: string, host?: string): Promise<any>;
+  updateUser(user: any): Promise<any>;
 }
 
 class DatabaseManager {
@@ -45,6 +53,14 @@ class DatabaseManager {
   async getTableStructure(tableName: string) { return this.adapter?.getTableStructure(tableName); }
   async updateTableStructure(tableName: string, actions: any[]) { return this.adapter?.updateTableStructure(tableName, actions); }
   async executeQuery(query: string) { return this.adapter?.executeQuery(query); }
+  async listDatabases() { return this.adapter?.listDatabases(); }
+  async createDatabase(name: string) { return this.adapter?.createDatabase(name); }
+  async dropDatabase(name: string) { return this.adapter?.dropDatabase(name); }
+  async switchDatabase(name: string) { return this.adapter?.switchDatabase(name); }
+  async listUsers() { return this.adapter?.listUsers(); }
+  async createUser(user: any) { return this.adapter?.createUser(user); }
+  async dropUser(username: string, host?: string) { return this.adapter?.dropUser(username, host); }
+  async updateUser(user: any) { return this.adapter?.updateUser(user); }
 }
 
 export const dbManager = new DatabaseManager();

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Card, Form, Input, Button, Select, message, Typography, InputNumber } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Card, Form, Input, Button, Select, message, Typography, InputNumber, Divider, Space } from 'antd';
 import { DatabaseOutlined } from '@ant-design/icons';
 import { ipc } from '../renderer/ipc';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +16,36 @@ const ConnectionScreen: React.FC<ConnectionScreenProps> = ({ onConnect }) => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const [dbType, setDbType] = useState('mysql');
+  const [localInstances, setLocalInstances] = useState<any[]>([]);
+
+  useEffect(() => {
+    loadLocalInstances();
+  }, []);
+
+  const loadLocalInstances = async () => {
+    try {
+      const engines = await ipc.listEngines();
+      // Filter only running instances
+      setLocalInstances(engines.filter((e: any) => e.status === 'running'));
+    } catch (e) {
+      console.error('Failed to load local instances');
+    }
+  };
+
+  const handleLocalInstanceSelect = (instanceId: string) => {
+    const instance = localInstances.find(i => i.id === instanceId);
+    if (instance) {
+      form.setFieldsValue({
+        type: instance.type,
+        host: 'localhost',
+        port: instance.port,
+        user: 'root', // Default guess
+        password: '',
+        database: ''
+      });
+      setDbType(instance.type);
+    }
+  };
 
   const handleConnect = async (values: any) => {
     setLoading(true);
@@ -44,8 +74,22 @@ const ConnectionScreen: React.FC<ConnectionScreenProps> = ({ onConnect }) => {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#000' }}>
-      <Card style={{ width: 400, textAlign: 'center' }}>
+      <Card style={{ width: 450, textAlign: 'center' }}>
         <Title level={3}><DatabaseOutlined /> Connect to Database</Title>
+        
+        {localInstances.length > 0 && (
+          <>
+            <Form.Item label="Running Local Instances">
+              <Select placeholder="Select a running local instance" onChange={handleLocalInstanceSelect}>
+                {localInstances.map(i => (
+                  <Option key={i.id} value={i.id}>{i.name} ({i.type} : {i.port})</Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Divider>OR</Divider>
+          </>
+        )}
+
         <Form
           form={form}
           layout="vertical"
@@ -108,6 +152,11 @@ const ConnectionScreen: React.FC<ConnectionScreenProps> = ({ onConnect }) => {
             </Button>
           </Form.Item>
         </Form>
+        
+        <Divider />
+        <Button type="dashed" block onClick={() => navigate('/engines')}>
+          Manage / Install Local Engines
+        </Button>
       </Card>
     </div>
   );

@@ -190,4 +190,59 @@ export class MysqlAdapter {
     const [rows] = await this.connection.query(query);
     return rows;
   }
+
+  async listDatabases() {
+      if (!this.connection) throw new Error('Database not connected');
+      const [rows] = await this.connection.execute('SHOW DATABASES');
+      const systemDbs = ['information_schema', 'mysql', 'performance_schema', 'sys'];
+      return (rows as any[]).map(row => row.Database).filter(db => !systemDbs.includes(db));
+  }
+
+  async createDatabase(name: string) {
+      if (!this.connection) throw new Error('Database not connected');
+      await this.connection.execute(`CREATE DATABASE \`${name}\``);
+      return { success: true };
+  }
+
+  async dropDatabase(name: string) {
+      if (!this.connection) throw new Error('Database not connected');
+      await this.connection.execute(`DROP DATABASE \`${name}\``);
+      return { success: true };
+  }
+
+  async switchDatabase(name: string) {
+      if (!this.connection) throw new Error('Database not connected');
+      await this.connection.changeUser({ database: name });
+      // Or simply: await this.connection.query(`USE \`${name}\``);
+      // changeUser is cleaner for connection state
+      return { success: true };
+  }
+
+  async listUsers() {
+      if (!this.connection) throw new Error('Database not connected');
+      const [rows] = await this.connection.execute('SELECT User, Host FROM mysql.user');
+      return (rows as any[]).map(row => ({ username: row.User, host: row.Host }));
+  }
+
+  async createUser(user: any) {
+      if (!this.connection) throw new Error('Database not connected');
+      const { username, password, host = '%' } = user;
+      await this.connection.execute(`CREATE USER ?@? IDENTIFIED BY ?`, [username, host, password]);
+      return { success: true };
+  }
+
+  async dropUser(username: string, host: string = '%') {
+      if (!this.connection) throw new Error('Database not connected');
+      await this.connection.execute(`DROP USER ?@?`, [username, host]);
+      return { success: true };
+  }
+
+  async updateUser(user: any) {
+      if (!this.connection) throw new Error('Database not connected');
+      const { username, password, host = '%' } = user;
+      if (password) {
+          await this.connection.execute(`ALTER USER ?@? IDENTIFIED BY ?`, [username, host, password]);
+      }
+      return { success: true };
+  }
 }

@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, theme } from 'antd';
 import ConnectionScreen from './screens/ConnectionScreen';
 import ExplorerScreen from './screens/ExplorerScreen';
+import EngineManagerScreen from './screens/EngineManagerScreen';
 
 const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -21,6 +22,10 @@ const App: React.FC = () => {
           <Route 
             path="/connect" 
             element={<ConnectionScreen onConnect={() => setIsConnected(true)} />} 
+          />
+          <Route 
+            path="/engines" 
+            element={<EngineManagerScreen onConnect={() => setIsConnected(true)} />} 
           />
           <Route 
             path="/explorer" 

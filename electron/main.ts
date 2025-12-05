@@ -1,11 +1,14 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'node:path'
 import { dbManager } from '../src/server/db'
+import { EngineController } from '../src/server/engineManager/engineController'
+import { EngineInstance } from '../src/server/engineManager/types'
 
 process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public')
 
 let win: BrowserWindow | null
+const engineController = new EngineController()
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 
@@ -38,11 +41,20 @@ function createWindow() {
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
+  console.log('Window all closed, setting quitting flag...');
+  engineController.setQuitting();
   if (process.platform !== 'darwin') {
     app.quit()
     win = null
   }
 })
+
+app.on('before-quit', async (event) => {
+    console.log('App closing, setting quitting flag...');
+    // Do NOT stop instances if we want them to persist.
+    // Just mark as quitting so we don't overwrite the config with 'stopped'
+    engineController.setQuitting();
+});
 
 app.on('activate', () => {
   // On OS X it's common to re-create a window in the app when the
@@ -108,5 +120,69 @@ app.whenReady().then(() => {
 
   ipcMain.handle('execute-query', async (_, query) => {
     return dbManager.executeQuery(query);
+  });
+
+  ipcMain.handle('list-databases', async () => {
+      return dbManager.listDatabases();
+  });
+
+  ipcMain.handle('create-database', async (_, name) => {
+      return dbManager.createDatabase(name);
+  });
+
+  ipcMain.handle('drop-database', async (_, name) => {
+      return dbManager.dropDatabase(name);
+  });
+
+  ipcMain.handle('switch-database', async (_, name) => {
+      return dbManager.switchDatabase(name);
+  });
+
+  ipcMain.handle('list-users', async () => {
+      return dbManager.listUsers();
+  });
+
+  ipcMain.handle('create-user', async (_, user) => {
+      return dbManager.createUser(user);
+  });
+
+  ipcMain.handle('drop-user', async (_, { username, host }) => {
+      return dbManager.dropUser(username, host);
+  });
+
+  ipcMain.handle('update-user', async (_, user) => {
+      return dbManager.updateUser(user);
+  });
+
+  // Engine Manager IPC
+  ipcMain.handle('engine-list', async () => {
+    return engineController.getInstances();
+  });
+
+  ipcMain.handle('engine-create', async (event, instance: EngineInstance) => {
+    return engineController.addInstance(instance, (percent) => {
+        event.sender.send('engine-download-progress', percent);
+    });
+  });
+
+  ipcMain.handle('engine-remove', async (event, id: string) => {
+    return engineController.removeInstance(id);
+  });
+
+  ipcMain.handle('engine-start', async (event, id: string) => {
+    return engineController.startInstance(id);
+  });
+
+  ipcMain.handle('engine-stop', async (event, id: string) => {
+    return engineController.stopInstance(id);
+  });
+
+  ipcMain.handle('get-default-engine-paths', async () => {
+    const userDataPath = app.getPath('userData');
+    const enginesPath = path.join(userDataPath, 'engines');
+    return {
+      base: enginesPath,
+      platform: process.platform
+    };
   });
 })
