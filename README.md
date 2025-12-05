@@ -12,10 +12,10 @@
 ## ✨ Features
 
 - 🔌 **Multi-Database Support**: Connect effortlessly to MySQL and PostgreSQL.
-- 📊 **Table Explorer**: View and edit data with a powerful, spreadsheet-like grid interface.
+- 📊 **Table Explorer**: View and edit data with a powerful, specialized Ant Design Table interface.
 - 🛠️ **Structure Editor**: Visually modify table schemas, manage columns, and data types.
 - 🔗 **Foreign Key Manager**: Intuitive visual editor for managing foreign key constraints.
-- 📝 **SQL Editor**: Execute custom queries with syntax highlighting and result visualization.
+- 📝 **SQL Editor**: Execute queries with a full-featured code editor (CodeMirror) supporting syntax highlighting and auto-completion.
 - 💾 **Batch Editing**: Make multiple changes and save them in a single transaction.
 - 🌑 **Dark Mode**: A sleek, dark-themed interface designed for developer comfort.
 
@@ -24,7 +24,7 @@
 - **Runtime**: [Electron](https://www.electronjs.org/)
 - **Frontend**: [React](https://reactjs.org/), [Vite](https://vitejs.dev/)
 - **UI Library**: [Ant Design](https://ant.design/)
-- **Data Grid**: [React Tabulator](https://github.com/ngduc/react-tabulator)
+- **Code Editor**: [CodeMirror](https://uiwjs.github.io/react-codemirror/)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
 
 ## 📂 File Structure
@@ -38,6 +38,7 @@ Lumabase/
 │   ├── main.ts                 # App entry point & IPC handlers
 │   └── preload.ts              # Secure IPC bridge
 ├── src/                        # Renderer process (React)
+│   ├── components/             # Reusable UI Components
 │   ├── hooks/                  # Custom hooks (Logic)
 │   ├── renderer/               # IPC wrappers
 │   ├── screens/                # UI Components & Screens
@@ -60,8 +61,8 @@ Lumabase/
 
 1.  **Clone the repository**
     ```bash
-    git clone <repository-url>
-    cd lumabase
+    git clone https://github.com/arifurrahmanns/Lumabase.git
+    cd Lumabase
     ```
 
 2.  **Install dependencies**

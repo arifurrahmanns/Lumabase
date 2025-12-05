@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Layout, Input, Button, Table, message, Space } from 'antd';
+import { Layout, Button, Table, message, Space } from 'antd';
 import { PlayCircleOutlined } from '@ant-design/icons';
+import CodeMirror from '@uiw/react-codemirror';
+import { sql } from '@codemirror/lang-sql';
+import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { ipc } from '../renderer/ipc';
 
 const { Content } = Layout;
-const { TextArea } = Input;
 
 interface SqlEditorProps {
     connectionId: string;
@@ -62,13 +64,21 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ connectionId, initialQuery = '' }
     <Layout style={{ height: '100%', background: '#141414' }}>
       <Content style={{ display: 'flex', flexDirection: 'column', padding: 16, gap: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <TextArea 
-                rows={6} 
-                value={query} 
-                onChange={e => setQuery(e.target.value)} 
-                placeholder="SELECT * FROM table..." 
-                style={{ fontFamily: 'monospace', fontSize: 14 }}
-            />
+            <div style={{ border: '1px solid #303030', borderRadius: 4, overflow: 'hidden' }}>
+                <CodeMirror
+                    value={query}
+                    height="200px"
+                    theme={vscodeDark}
+                    extensions={[sql()]}
+                    onChange={(val) => setQuery(val)}
+                    basicSetup={{
+                        foldGutter: true,
+                        dropCursor: true,
+                        allowMultipleSelections: true,
+                        indentOnInput: true,
+                    }}
+                />
+            </div>
             <Space>
                 <Button 
                     type="primary" 
@@ -94,7 +104,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ connectionId, initialQuery = '' }
                 rowKey={(record, index) => index!.toString()} 
                 pagination={{ pageSize: 50 }} 
                 size="small"
-                scroll={{ x: 'max-content' }}
+                scroll={{ y: 'calc(100vh - 400px)' }} // Adjust scroll height considering editor height
                 locale={{ emptyText: 'No results' }}
             />
         </div>

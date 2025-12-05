@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { message } from 'antd';
 import { ipc } from '../renderer/ipc';
 
@@ -12,32 +12,20 @@ export const useBatchEditor = (
     const [logViewerVisible, setLogViewerVisible] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    const handleCellEdited = (cell: any) => {
-        const row = cell.getData();
-        const field = cell.getField();
-        const value = cell.getValue();
-        const oldValue = cell.getOldValue();
-        
-        // Strict comparison to avoid false positives
-        if (value === oldValue) return;
-        if ((value === '' && oldValue === null) || (value === null && oldValue === '')) return;
-
+    const handleFieldChange = useCallback((row: any, field: string, value: any) => {
         const pk = 'id'; // Simplified: assuming 'id' is PK
 
         if (row[pk] !== undefined) {
-            setPendingChanges(prev => {
+             setPendingChanges(prev => {
                 const newMap = new Map(prev);
                 const existing = newMap.get(row[pk]) || {};
                 newMap.set(row[pk], { ...existing, [field]: value });
                 return newMap;
             });
-        } else {
-            message.warning('Cannot edit: Primary Key "id" not found in row');
-            cell.restoreOldValue();
         }
-    };
+    }, []);
 
-    const handleSave = async () => {
+    const handleSave = useCallback(async () => {
         if (!activeTable) return;
         setSaving(true);
         const batchLogs: any[] = [];
@@ -76,7 +64,7 @@ export const useBatchEditor = (
         onReload();
         
         setSaving(false);
-    };
+    }, [activeTable, connectionId, pendingChanges, onReload]);
 
     return {
         pendingChanges,
@@ -86,7 +74,7 @@ export const useBatchEditor = (
         logViewerVisible,
         setLogViewerVisible,
         saving,
-        handleCellEdited,
+        handleFieldChange,
         handleSave
     };
 };

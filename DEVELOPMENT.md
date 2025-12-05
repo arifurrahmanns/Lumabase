@@ -75,7 +75,9 @@ To keep the application scalable, avoid putting complex logic directly inside Re
 
 ### Column Generation (Utils)
 
-Table column definitions (especially for Tabulator) can get complex. Use `src/utils/columnBuilder.ts` to generate these definitions dynamically based on the table structure. This keeps the `ExplorerScreen` clean.
+### Column Generation (Utils)
+
+Table column definitions (especially for Ant Design Table) can get complex. Use `src/utils/columnBuilder.tsx` to generate these definitions dynamically based on the table structure. This keeps the `ExplorerScreen` clean.
 
 ### IPC Communication
 

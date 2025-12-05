@@ -6,7 +6,8 @@ import { buildColumns } from '../utils/columnBuilder';
 export const useTableData = (
     connectionId: string,
     activeTable: string | null,
-    onNavigate: (table: string, filter: { field: string; value: any }) => void
+    onNavigate: (table: string, filter: { field: string; value: any }) => void,
+    handleSave: (row: any) => void
 ) => {
     const [tableData, setTableData] = useState<any[]>([]);
     const [columns, setColumns] = useState<any[]>([]);
@@ -21,7 +22,7 @@ export const useTableData = (
             const data = await ipc.getTableData(connectionId, activeTable);
             const structure = await ipc.getTableStructure(connectionId, activeTable);
             
-            const cols = await buildColumns(structure, onNavigate);
+            const cols = await buildColumns(structure, onNavigate, handleSave);
             
             setColumns(cols);
             setTableData(data);
@@ -31,7 +32,7 @@ export const useTableData = (
         } finally {
             setLoading(false);
         }
-    }, [connectionId, activeTable, onNavigate]);
+    }, [connectionId, activeTable, onNavigate, handleSave]);
 
     useEffect(() => {
         loadTableData();
@@ -41,8 +42,9 @@ export const useTableData = (
 
     return {
         tableData,
-        setTableData, // Exposed for optimistic updates
+        setTableData, 
         columns,
+        setColumns,
         loading,
         refresh,
         loadTableData // Exposed for reloading after save

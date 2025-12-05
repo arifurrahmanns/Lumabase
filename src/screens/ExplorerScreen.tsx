@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Layout, Menu, Button, Space, Empty, message, Select, Modal, Form, Input } from 'antd';
+import { Layout, Menu, Button, Space, Empty, message, Select, Modal, Form, Input, Table } from 'antd';
 import { PlusOutlined, ReloadOutlined, EditOutlined, TableOutlined, CodeOutlined, DeleteOutlined } from '@ant-design/icons';
-import { ReactTabulator } from 'react-tabulator';
 import { ipc } from '../renderer/ipc';
 import TableStructureEditor from './TableStructureEditor';
 import CreateTableModal from './CreateTableModal';
@@ -10,6 +9,10 @@ import SqlEditor from './SqlEditor';
 import LogViewer from './LogViewer';
 import { useTableData } from '../hooks/useTableData';
 import { useBatchEditor } from '../hooks/useBatchEditor';
+import ResizableTitle from '../components/ResizableTitle';
+import { EditableCell } from '../components/EditableCell';
+import '../components/ResizableTitle.css';
+import './ExplorerScreen.css';
 
 const { Sider, Content, Footer } = Layout;
 
@@ -29,22 +32,15 @@ const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
   const [isCreateTableModalVisible, setIsCreateTableModalVisible] = useState(false);
   const [isUserModalVisible, setIsUserModalVisible] = useState(false);
   const [createDbForm] = Form.useForm();
-  const tableRef = useRef<any>(null);
+  
+  // Ref to hold latest tableData to avoid dependency cycles
+  const tableDataRef = useRef<any[]>([]);
 
   // Navigation callback for FKs
   const handleNavigate = useCallback((table: string, filter: { field: string; value: any }) => {
       setPendingFilter(filter);
       setActiveTable(table);
   }, []);
-
-  // Custom Hooks
-  const { 
-      tableData, 
-      columns, 
-      loading: dataLoading, 
-      refresh, 
-      loadTableData 
-  } = useTableData(connectionId, activeTable, handleNavigate);
 
   const { 
       pendingChanges, 
@@ -53,32 +49,88 @@ const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
       logViewerVisible, 
       setLogViewerVisible, 
       saving, 
-      handleCellEdited, 
+      handleFieldChange, 
       handleSave 
-  } = useBatchEditor(connectionId, activeTable, loadTableData);
+  } = useBatchEditor(connectionId, activeTable, () => {
+      loadTableData();
+  });
+
+  // Now handleRowSave can use ref, so it doesn't need tableData in dependency
+  const handleRowSave = useCallback((newRow: any) => {
+    // Find the original row to detect changes from REF
+    const oldRow = tableDataRef.current.find((r: any) => r.id === newRow.id);
+    if (!oldRow) return;
+
+    Object.keys(newRow).forEach(key => {
+        if (newRow[key] !== oldRow[key]) {
+            handleFieldChange(newRow, key, newRow[key]);
+        }
+    });
+
+    // Optimistically update local data
+    setTableData(prevData => {
+        const newData = [...prevData];
+        const index = newData.findIndex((item) => item.id === newRow.id);
+        if (index > -1) {
+            const item = newData[index];
+            newData.splice(index, 1, { ...item, ...newRow });
+        }
+        return newData;
+    });
+  }, [handleFieldChange]); // No tableData dependency!
+
+  // Custom Hooks
+  const { 
+      tableData, 
+      columns, 
+      loading: dataLoading, 
+      refresh, 
+      loadTableData,
+      setTableData,
+      setColumns
+  } = useTableData(connectionId, activeTable, handleNavigate, handleRowSave);
+
+  // Keep ref in sync
+  useEffect(() => {
+      tableDataRef.current = tableData;
+  }, [tableData]);
 
   useEffect(() => {
     loadTables();
     loadDatabases();
   }, [connectionId]);
 
-  // Filter application logic
-  useEffect(() => {
-    if (pendingFilter && tableRef.current && tableData.length > 0) {
-        const instance = tableRef.current;
-        if (instance) {
-            console.log('Applying filter:', pendingFilter);
-            const table = instance.table || instance;
-            
-            if (table && typeof table.setFilter === 'function') {
-                table.clearFilter();
-                table.setFilter(pendingFilter.field, '=', pendingFilter.value);
-                message.success(`Filtered by ${pendingFilter.field} = ${pendingFilter.value}`);
-                setPendingFilter(null);
-            }
-        }
-    }
+  // Handle Resize using ref for columns if needed, or just functional update?
+  // We need to update columns which comes from useTableData. 
+  // useTableData returns setColumns now.
+  const handleResize = (index: number) => (_: any, { size }: any) => {
+       // We access setColumns from the hook result.
+       // But wait, setColumns is returned from useTableData but it is not in scope here inside handleResize definition 
+       // unless we define handleResize inside the component body (which it is).
+       // BUT columns is also from hook.
+       setColumns((prevColumns: any[]) => {
+           const nextColumns = [...prevColumns];
+           nextColumns[index] = {
+               ...nextColumns[index],
+               width: size.width,
+           };
+           return nextColumns;
+       });
+  };
+
+  // Filter application logic 
+  const filteredData = React.useMemo(() => {
+     if (!pendingFilter) return tableData;
+     return tableData.filter(item => item[pendingFilter.field] == pendingFilter.value);
   }, [tableData, pendingFilter]);
+
+  useEffect(() => {
+       if (pendingFilter) {
+           message.success(`Filtered by ${pendingFilter.field} = ${pendingFilter.value}`);
+       }
+  }, [pendingFilter]);
+  
+  const clearFilter = () => setPendingFilter(null);
 
   const loadTables = async () => {
     try {
@@ -149,20 +201,40 @@ const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
       }
   };
 
-  // Add Delete button column
-  const gridColumns = [
-      ...columns,
-      { title: 'Actions', formatter: 'buttonCross', width: 80, align: 'center', resizable: false, cellClick: async (e: any, cell: any) => {
-          if (!window.confirm('Delete this row?')) return;
-          const row = cell.getRow().getData();
-          const pk = 'id'; // Simplified
-          if (row[pk]) {
-              await ipc.deleteRow(connectionId, activeTable!, pk, row[pk]);
-              cell.getRow().delete();
-              message.success('Deleted');
-          }
-      }}
-  ];
+  // Merge columns with resize handler and Delete button
+  const mergedColumns = columns.map((col, index) => ({
+      ...col,
+      onHeaderCell: (column: any) => ({
+          width: column.width,
+          onResize: handleResize(index),
+      }),
+  }));
+
+  // Add Actions column
+  const actionColumn = {
+      title: 'Actions',
+      key: 'actions',
+      width: 100,
+      render: (_: any, record: any) => (
+          <Button 
+            type="text" 
+            danger 
+            icon={<DeleteOutlined />} 
+            onClick={async (e) => {
+                e.stopPropagation();
+                if (!window.confirm('Delete this row?')) return;
+                const pk = 'id'; // Simplified
+                if (record[pk]) {
+                    await ipc.deleteRow(connectionId, activeTable!, pk, record[pk]);
+                    loadTableData(); // Reload or splice locally
+                    message.success('Deleted');
+                }
+            }}
+          />
+      )
+  };
+
+  const gridColumns = [...mergedColumns, actionColumn];
 
   return (
     <Layout style={{ height: '100%' }}>
@@ -223,9 +295,11 @@ const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
               if (e.key === 'sql-editor') {
                   setViewMode('sql');
                   setActiveTable(null);
+                  setPendingFilter(null);
               } else {
                   setViewMode('table');
                   setActiveTable(e.key);
+                  setPendingFilter(null);
               }
           }}
           items={[
@@ -250,25 +324,23 @@ const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
                     <Button icon={<PlusOutlined />} onClick={handleAddRow}>Add Row</Button>
                     <Button icon={<ReloadOutlined />} onClick={refresh}>Refresh</Button>
                     <Button icon={<EditOutlined />} onClick={() => setIsStructureModalVisible(true)}>Structure</Button>
+                    {pendingFilter && <Button onClick={clearFilter}>Clear Filter</Button>}
                 </Space>
-                <div style={{ color: 'var(--muted-foreground)' }}>{tableData.length} rows</div>
+                <div style={{ color: 'var(--muted-foreground)' }}>{filteredData.length} rows</div>
               </div>
-              <div style={{ flex: 1, overflow: 'hidden' }}>
-                <ReactTabulator
-                  key={activeTable} // Force remount on table change
-                  data={tableData}
+              <div style={{ flex: 1, overflow: 'auto' }}>
+                <Table
+                  bordered
+                  dataSource={filteredData}
                   columns={gridColumns}
-                  layout="fitColumns"
-                  options={{
-                    height: "100%",
-                    movableColumns: true,
-                    resizableColumnFit: true,
+                  components={{
+                      header: { cell: ResizableTitle },
+                      body: { cell: EditableCell }
                   }}
-                  events={{
-                    cellEdited: handleCellEdited
-                  }}
-                  onRef={(r) => (tableRef.current = r)}
-                  className="dark-theme-tabulator"
+                  rowKey="id"
+                  pagination={{ pageSize: 50 }}
+                  scroll={{ y: 'calc(100vh - 200px)' }}
+                  size="small"
                 />
               </div>
             </>
@@ -326,7 +398,6 @@ const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
           connectionId={connectionId}
           onCancel={() => setIsStructureModalVisible(false)}
           onSuccess={() => {
-             // Refresh structure if needed, but usually we just close or reload data
              loadTableData();
           }}
         />
