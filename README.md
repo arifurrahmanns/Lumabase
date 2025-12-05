@@ -20,6 +20,28 @@
 - 💾 **Batch Editing**: Make multiple changes and save them in a single transaction.
 - 🖥️ **Custom UI**: Frameless window with a custom designed title bar, context-aware refresh, and dark-themed interface.
 
+## 📸 Screenshots
+
+### Home Dashboard
+Dashboard overview showing quick access to recent projects and server status.
+![Home Dashboard](screenshots/home.png)
+
+### Add Database Engine
+Easily download and install new database engines.
+![Add Database Engine](screenshots/add_new_database_engine.png)
+
+### Manage Instances
+Manage multiple database instances with ease.
+![Manage Instances](screenshots/multiple_db_instances.png)
+
+### Table Explorer
+Comprehensive table explorer for viewing and editing data.
+![Table Explorer](screenshots/database_tables.png)
+
+### SQL Editor
+Powerful SQL editor with syntax highlighting and auto-completion.
+![SQL Editor](screenshots/query_editor.png)
+
 ## 🛠️ Tech Stack
 
 - **Runtime**: [Electron](https://www.electronjs.org/)
