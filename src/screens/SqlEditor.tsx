@@ -6,8 +6,13 @@ import { ipc } from '../renderer/ipc';
 const { Content } = Layout;
 const { TextArea } = Input;
 
-const SqlEditor: React.FC = () => {
-  const [query, setQuery] = useState('');
+interface SqlEditorProps {
+    connectionId: string;
+    initialQuery?: string;
+}
+
+const SqlEditor: React.FC<SqlEditorProps> = ({ connectionId, initialQuery = '' }) => {
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<any[]>([]);
   const [columns, setColumns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -21,7 +26,7 @@ const SqlEditor: React.FC = () => {
     setColumns([]);
 
     try {
-      const data = await ipc.executeQuery(query);
+      const data = await ipc.executeQuery(connectionId, query);
       
       if (Array.isArray(data)) {
         setResults(data);

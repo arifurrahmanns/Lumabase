@@ -3,6 +3,7 @@ import { message } from 'antd';
 import { ipc } from '../renderer/ipc';
 
 export const useBatchEditor = (
+    connectionId: string,
     activeTable: string | null,
     onReload: () => void
 ) => {
@@ -45,7 +46,7 @@ export const useBatchEditor = (
 
         for (const [pkValue, changes] of pendingChanges.entries()) {
             try {
-                await ipc.updateRow(activeTable, changes, pk, pkValue);
+                await ipc.updateRow(connectionId, activeTable, changes, pk, pkValue);
                 batchLogs.push({
                     type: 'success',
                     message: `Successfully updated row ${pkValue}`,

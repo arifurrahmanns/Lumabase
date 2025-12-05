@@ -13,7 +13,11 @@ import { useBatchEditor } from '../hooks/useBatchEditor';
 
 const { Sider, Content, Footer } = Layout;
 
-const ExplorerScreen: React.FC = () => {
+interface ExplorerScreenProps {
+    connectionId: string;
+}
+
+const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
   const [tables, setTables] = useState<string[]>([]);
   const [activeTable, setActiveTable] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'sql'>('table');
@@ -40,7 +44,7 @@ const ExplorerScreen: React.FC = () => {
       loading: dataLoading, 
       refresh, 
       loadTableData 
-  } = useTableData(activeTable, handleNavigate);
+  } = useTableData(connectionId, activeTable, handleNavigate);
 
   const { 
       pendingChanges, 
@@ -51,12 +55,12 @@ const ExplorerScreen: React.FC = () => {
       saving, 
       handleCellEdited, 
       handleSave 
-  } = useBatchEditor(activeTable, loadTableData);
+  } = useBatchEditor(connectionId, activeTable, loadTableData);
 
   useEffect(() => {
     loadTables();
     loadDatabases();
-  }, []);
+  }, [connectionId]);
 
   // Filter application logic
   useEffect(() => {
@@ -78,7 +82,7 @@ const ExplorerScreen: React.FC = () => {
 
   const loadTables = async () => {
     try {
-      const list = await ipc.listTables();
+      const list = await ipc.listTables(connectionId);
       setTables(list);
     } catch (error) {
       message.error('Failed to load tables');
@@ -87,7 +91,7 @@ const ExplorerScreen: React.FC = () => {
 
   const loadDatabases = async () => {
       try {
-          const dbs = await ipc.listDatabases();
+          const dbs = await ipc.listDatabases(connectionId);
           setDatabases(dbs);
       } catch (error) {
           console.error(error);
@@ -96,7 +100,7 @@ const ExplorerScreen: React.FC = () => {
 
   const handleCreateDatabase = async (values: any) => {
       try {
-          await ipc.createDatabase(values.name);
+          await ipc.createDatabase(connectionId, values.name);
           message.success(`Database ${values.name} created`);
           setIsCreateDbModalVisible(false);
           createDbForm.resetFields();
@@ -108,7 +112,7 @@ const ExplorerScreen: React.FC = () => {
 
   const handleDatabaseChange = async (dbName: string) => {
       try {
-          await ipc.switchDatabase(dbName);
+          await ipc.switchDatabase(connectionId, dbName);
           setCurrentDb(dbName);
           message.success(`Switched to ${dbName}`);
           loadTables();
@@ -121,7 +125,7 @@ const ExplorerScreen: React.FC = () => {
   const handleDropDatabase = async (dbName: string) => {
       if (!window.confirm(`Are you sure you want to delete database "${dbName}"? This cannot be undone.`)) return;
       try {
-          await ipc.dropDatabase(dbName);
+          await ipc.dropDatabase(connectionId, dbName);
           message.success(`Database ${dbName} deleted`);
           if (currentDb === dbName) {
               setCurrentDb('');
@@ -137,7 +141,7 @@ const ExplorerScreen: React.FC = () => {
   const handleAddRow = async () => {
       if (!activeTable) return;
       try {
-          await ipc.addRow(activeTable, {});
+          await ipc.addRow(connectionId, activeTable, {});
           loadTableData();
           message.success('Row added');
       } catch (e) {
@@ -148,12 +152,12 @@ const ExplorerScreen: React.FC = () => {
   // Add Delete button column
   const gridColumns = [
       ...columns,
-      { title: 'Actions', formatter: 'buttonCross', width: 80, align: 'center', cellClick: async (e: any, cell: any) => {
+      { title: 'Actions', formatter: 'buttonCross', width: 80, align: 'center', resizable: false, cellClick: async (e: any, cell: any) => {
           if (!window.confirm('Delete this row?')) return;
           const row = cell.getRow().getData();
           const pk = 'id'; // Simplified
           if (row[pk]) {
-              await ipc.deleteRow(activeTable!, pk, row[pk]);
+              await ipc.deleteRow(connectionId, activeTable!, pk, row[pk]);
               cell.getRow().delete();
               message.success('Deleted');
           }
@@ -161,9 +165,11 @@ const ExplorerScreen: React.FC = () => {
   ];
 
   return (
-    <Layout style={{ height: '100vh' }}>
-      <Sider theme="dark" collapsible>
-        <div style={{ padding: 16 }}>
+    <Layout style={{ height: '100%' }}>
+      <Sider theme="dark" collapsible width={250} style={{ borderRight: '1px solid var(--border)', minHeight: '100%', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div className="sidebar-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+          <div style={{ padding: 16 }}>
             <Select 
                 style={{ width: '100%', marginBottom: 8 }} 
                 placeholder="Select Database"
@@ -227,23 +233,25 @@ const ExplorerScreen: React.FC = () => {
               ...tables.map(t => ({ key: t, icon: <TableOutlined />, label: t }))
           ]}
         />
-        <div style={{ padding: 16 }}>
-            <Button type="dashed" block icon={<PlusOutlined />} onClick={() => setIsCreateTableModalVisible(true)}>New Table</Button>
+          </div>
+          <div style={{ padding: 16, borderTop: '1px solid var(--border)' }}>
+              <Button type="dashed" block icon={<PlusOutlined />} onClick={() => setIsCreateTableModalVisible(true)}>New Table</Button>
+          </div>
         </div>
       </Sider>
       <Layout>
-        <Content style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Content style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
           {viewMode === 'sql' ? (
-              <SqlEditor />
+              <SqlEditor connectionId={connectionId} />
           ) : activeTable ? (
             <>
-              <div style={{ padding: '8px 16px', background: '#1f1f1f', borderBottom: '1px solid #303030', display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ padding: '8px 16px', background: 'var(--card)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
                 <Space>
                     <Button icon={<PlusOutlined />} onClick={handleAddRow}>Add Row</Button>
                     <Button icon={<ReloadOutlined />} onClick={refresh}>Refresh</Button>
                     <Button icon={<EditOutlined />} onClick={() => setIsStructureModalVisible(true)}>Structure</Button>
                 </Space>
-                <div style={{ color: '#888' }}>{tableData.length} rows</div>
+                <div style={{ color: 'var(--muted-foreground)' }}>{tableData.length} rows</div>
               </div>
               <div style={{ flex: 1, overflow: 'hidden' }}>
                 <ReactTabulator
@@ -254,6 +262,7 @@ const ExplorerScreen: React.FC = () => {
                   options={{
                     height: "100%",
                     movableColumns: true,
+                    resizableColumnFit: true,
                   }}
                   events={{
                     cellEdited: handleCellEdited
@@ -269,7 +278,7 @@ const ExplorerScreen: React.FC = () => {
             </div>
           )}
         </Content>
-        <Footer style={{ padding: '8px 16px', background: '#141414', color: '#666', borderTop: '1px solid #303030', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Footer style={{ padding: '8px 16px', background: 'var(--sidebar)', color: 'var(--muted-foreground)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{activeTable ? `Connected: ${activeTable}` : 'Ready'}</span>
             <Space>
                 <Button onClick={() => setLogViewerVisible(true)}>Logs</Button>
@@ -314,10 +323,11 @@ const ExplorerScreen: React.FC = () => {
         <TableStructureEditor
           visible={isStructureModalVisible}
           tableName={activeTable}
+          connectionId={connectionId}
           onCancel={() => setIsStructureModalVisible(false)}
           onSuccess={() => {
              // Refresh structure if needed, but usually we just close or reload data
-             loadTableData(activeTable);
+             loadTableData();
           }}
         />
       )}
@@ -325,6 +335,7 @@ const ExplorerScreen: React.FC = () => {
       <CreateTableModal
         visible={isCreateTableModalVisible}
         onCancel={() => setIsCreateTableModalVisible(false)}
+        connectionId={connectionId}
         onSuccess={() => {
             setIsCreateTableModalVisible(false);
             loadTables();
@@ -334,6 +345,7 @@ const ExplorerScreen: React.FC = () => {
       <UserManagementModal
         visible={isUserModalVisible}
         onCancel={() => setIsUserModalVisible(false)}
+        connectionId={connectionId}
       />
     </Layout>
   );

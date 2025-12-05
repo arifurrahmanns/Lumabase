@@ -10,6 +10,7 @@ export const buildColumns = async (
             title: col.name,
             field: col.name,
             editor: 'input',
+            resizable: true,
         };
 
         if (col.fk) {

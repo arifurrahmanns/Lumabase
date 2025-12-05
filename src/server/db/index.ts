@@ -24,43 +24,59 @@ interface DatabaseAdapter {
 }
 
 class DatabaseManager {
-  private adapter: DatabaseAdapter | null = null;
+  private connections: Map<string, DatabaseAdapter> = new Map();
 
-  async connect(config: any) {
+  async connect(config: any): Promise<{ success: boolean; connectionId?: string; error?: any }> {
     console.log('DatabaseManager.connect called with:', JSON.stringify(config));
     const type = config.type ? config.type.toString().trim() : '';
     console.log(`Type: '${type}', Equal to mysql? ${type === 'mysql'}`);
     
+    let adapter: DatabaseAdapter;
     if (type === 'mysql') {
-      this.adapter = new MysqlAdapter();
+      adapter = new MysqlAdapter();
     } else if (type === 'postgres') {
-      this.adapter = new PostgresAdapter();
+      adapter = new PostgresAdapter();
     } else {
       console.error('Unsupported type:', type);
       throw new Error(`Unsupported database type: ${config.type}`);
     }
-    return this.adapter.connect(config);
+
+    try {
+        await adapter.connect(config);
+        const connectionId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        this.connections.set(connectionId, adapter);
+        return { success: true, connectionId };
+    } catch (e) {
+        return { success: false, error: e };
+    }
+  }
+
+  private getAdapter(connectionId: string) {
+      const adapter = this.connections.get(connectionId);
+      if (!adapter) throw new Error(`Connection ${connectionId} not found`);
+      return adapter;
   }
 
   // Proxy methods to the active adapter
-  async listTables() { return this.adapter?.listTables(); }
-  async getTableData(tableName: string) { return this.adapter?.getTableData(tableName); }
-  async addRow(tableName: string, row: any) { return this.adapter?.addRow(tableName, row); }
-  async updateRow(tableName: string, row: any, pkCol: string, pkVal: any) { return this.adapter?.updateRow(tableName, row, pkCol, pkVal); }
-  async deleteRow(tableName: string, pkCol: string, pkVal: any) { return this.adapter?.deleteRow(tableName, pkCol, pkVal); }
-  async createTable(tableName: string, columns: any[]) { return this.adapter?.createTable(tableName, columns); }
-  async dropTable(tableName: string) { return this.adapter?.dropTable(tableName); }
-  async getTableStructure(tableName: string) { return this.adapter?.getTableStructure(tableName); }
-  async updateTableStructure(tableName: string, actions: any[]) { return this.adapter?.updateTableStructure(tableName, actions); }
-  async executeQuery(query: string) { return this.adapter?.executeQuery(query); }
-  async listDatabases() { return this.adapter?.listDatabases(); }
-  async createDatabase(name: string) { return this.adapter?.createDatabase(name); }
-  async dropDatabase(name: string) { return this.adapter?.dropDatabase(name); }
-  async switchDatabase(name: string) { return this.adapter?.switchDatabase(name); }
-  async listUsers() { return this.adapter?.listUsers(); }
-  async createUser(user: any) { return this.adapter?.createUser(user); }
-  async dropUser(username: string, host?: string) { return this.adapter?.dropUser(username, host); }
-  async updateUser(user: any) { return this.adapter?.updateUser(user); }
+  // Proxy methods to the active adapter
+  async listTables(connectionId: string) { return this.getAdapter(connectionId).listTables(); }
+  async getTableData(connectionId: string, tableName: string) { return this.getAdapter(connectionId).getTableData(tableName); }
+  async addRow(connectionId: string, tableName: string, row: any) { return this.getAdapter(connectionId).addRow(tableName, row); }
+  async updateRow(connectionId: string, tableName: string, row: any, pkCol: string, pkVal: any) { return this.getAdapter(connectionId).updateRow(tableName, row, pkCol, pkVal); }
+  async deleteRow(connectionId: string, tableName: string, pkCol: string, pkVal: any) { return this.getAdapter(connectionId).deleteRow(tableName, pkCol, pkVal); }
+  async createTable(connectionId: string, tableName: string, columns: any[]) { return this.getAdapter(connectionId).createTable(tableName, columns); }
+  async dropTable(connectionId: string, tableName: string) { return this.getAdapter(connectionId).dropTable(tableName); }
+  async getTableStructure(connectionId: string, tableName: string) { return this.getAdapter(connectionId).getTableStructure(tableName); }
+  async updateTableStructure(connectionId: string, tableName: string, actions: any[]) { return this.getAdapter(connectionId).updateTableStructure(tableName, actions); }
+  async executeQuery(connectionId: string, query: string) { return this.getAdapter(connectionId).executeQuery(query); }
+  async listDatabases(connectionId: string) { return this.getAdapter(connectionId).listDatabases(); }
+  async createDatabase(connectionId: string, name: string) { return this.getAdapter(connectionId).createDatabase(name); }
+  async dropDatabase(connectionId: string, name: string) { return this.getAdapter(connectionId).dropDatabase(name); }
+  async switchDatabase(connectionId: string, name: string) { return this.getAdapter(connectionId).switchDatabase(name); }
+  async listUsers(connectionId: string) { return this.getAdapter(connectionId).listUsers(); }
+  async createUser(connectionId: string, user: any) { return this.getAdapter(connectionId).createUser(user); }
+  async dropUser(connectionId: string, username: string, host?: string) { return this.getAdapter(connectionId).dropUser(username, host); }
+  async updateUser(connectionId: string, user: any) { return this.getAdapter(connectionId).updateUser(user); }
 }
 
 export const dbManager = new DatabaseManager();

@@ -445,94 +445,90 @@ class PostgresAdapter {
 }
 class DatabaseManager {
   constructor() {
-    __publicField(this, "adapter", null);
+    __publicField(this, "connections", /* @__PURE__ */ new Map());
   }
   async connect(config2) {
     console.log("DatabaseManager.connect called with:", JSON.stringify(config2));
     const type2 = config2.type ? config2.type.toString().trim() : "";
     console.log(`Type: '${type2}', Equal to mysql? ${type2 === "mysql"}`);
+    let adapter;
     if (type2 === "mysql") {
-      this.adapter = new MysqlAdapter();
+      adapter = new MysqlAdapter();
     } else if (type2 === "postgres") {
-      this.adapter = new PostgresAdapter();
+      adapter = new PostgresAdapter();
     } else {
       console.error("Unsupported type:", type2);
       throw new Error(`Unsupported database type: ${config2.type}`);
     }
-    return this.adapter.connect(config2);
+    try {
+      await adapter.connect(config2);
+      const connectionId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+      this.connections.set(connectionId, adapter);
+      return { success: true, connectionId };
+    } catch (e) {
+      return { success: false, error: e };
+    }
+  }
+  getAdapter(connectionId) {
+    const adapter = this.connections.get(connectionId);
+    if (!adapter) throw new Error(`Connection ${connectionId} not found`);
+    return adapter;
   }
   // Proxy methods to the active adapter
-  async listTables() {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.listTables();
+  // Proxy methods to the active adapter
+  async listTables(connectionId) {
+    return this.getAdapter(connectionId).listTables();
   }
-  async getTableData(tableName) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.getTableData(tableName);
+  async getTableData(connectionId, tableName) {
+    return this.getAdapter(connectionId).getTableData(tableName);
   }
-  async addRow(tableName, row) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.addRow(tableName, row);
+  async addRow(connectionId, tableName, row) {
+    return this.getAdapter(connectionId).addRow(tableName, row);
   }
-  async updateRow(tableName, row, pkCol, pkVal) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.updateRow(tableName, row, pkCol, pkVal);
+  async updateRow(connectionId, tableName, row, pkCol, pkVal) {
+    return this.getAdapter(connectionId).updateRow(tableName, row, pkCol, pkVal);
   }
-  async deleteRow(tableName, pkCol, pkVal) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.deleteRow(tableName, pkCol, pkVal);
+  async deleteRow(connectionId, tableName, pkCol, pkVal) {
+    return this.getAdapter(connectionId).deleteRow(tableName, pkCol, pkVal);
   }
-  async createTable(tableName, columns) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.createTable(tableName, columns);
+  async createTable(connectionId, tableName, columns) {
+    return this.getAdapter(connectionId).createTable(tableName, columns);
   }
-  async dropTable(tableName) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.dropTable(tableName);
+  async dropTable(connectionId, tableName) {
+    return this.getAdapter(connectionId).dropTable(tableName);
   }
-  async getTableStructure(tableName) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.getTableStructure(tableName);
+  async getTableStructure(connectionId, tableName) {
+    return this.getAdapter(connectionId).getTableStructure(tableName);
   }
-  async updateTableStructure(tableName, actions) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.updateTableStructure(tableName, actions);
+  async updateTableStructure(connectionId, tableName, actions) {
+    return this.getAdapter(connectionId).updateTableStructure(tableName, actions);
   }
-  async executeQuery(query) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.executeQuery(query);
+  async executeQuery(connectionId, query) {
+    return this.getAdapter(connectionId).executeQuery(query);
   }
-  async listDatabases() {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.listDatabases();
+  async listDatabases(connectionId) {
+    return this.getAdapter(connectionId).listDatabases();
   }
-  async createDatabase(name) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.createDatabase(name);
+  async createDatabase(connectionId, name) {
+    return this.getAdapter(connectionId).createDatabase(name);
   }
-  async dropDatabase(name) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.dropDatabase(name);
+  async dropDatabase(connectionId, name) {
+    return this.getAdapter(connectionId).dropDatabase(name);
   }
-  async switchDatabase(name) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.switchDatabase(name);
+  async switchDatabase(connectionId, name) {
+    return this.getAdapter(connectionId).switchDatabase(name);
   }
-  async listUsers() {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.listUsers();
+  async listUsers(connectionId) {
+    return this.getAdapter(connectionId).listUsers();
   }
-  async createUser(user) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.createUser(user);
+  async createUser(connectionId, user) {
+    return this.getAdapter(connectionId).createUser(user);
   }
-  async dropUser(username, host) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.dropUser(username, host);
+  async dropUser(connectionId, username, host) {
+    return this.getAdapter(connectionId).dropUser(username, host);
   }
-  async updateUser(user) {
-    var _a;
-    return (_a = this.adapter) == null ? void 0 : _a.updateUser(user);
+  async updateUser(connectionId, user) {
+    return this.getAdapter(connectionId).updateUser(user);
   }
 }
 const dbManager = new DatabaseManager();
@@ -20648,59 +20644,59 @@ electron.app.whenReady().then(() => {
   electron.ipcMain.handle("test-connection", async (_, config2) => {
     return dbManager.connect(config2);
   });
-  electron.ipcMain.handle("list-tables", async () => {
-    return dbManager.listTables();
+  electron.ipcMain.handle("list-tables", async (_, connectionId) => {
+    return dbManager.listTables(connectionId);
   });
-  electron.ipcMain.handle("get-table-data", async (_, tableName) => {
-    return dbManager.getTableData(tableName);
+  electron.ipcMain.handle("get-table-data", async (_, { connectionId, tableName }) => {
+    return dbManager.getTableData(connectionId, tableName);
   });
-  electron.ipcMain.handle("add-row", async (_, { tableName, row }) => {
-    return dbManager.addRow(tableName, row);
+  electron.ipcMain.handle("add-row", async (_, { connectionId, tableName, row }) => {
+    return dbManager.addRow(connectionId, tableName, row);
   });
-  electron.ipcMain.handle("update-row", async (_, { tableName, row, primaryKeyColumn, primaryKeyValue }) => {
-    return dbManager.updateRow(tableName, row, primaryKeyColumn, primaryKeyValue);
+  electron.ipcMain.handle("update-row", async (_, { connectionId, tableName, row, primaryKeyColumn, primaryKeyValue }) => {
+    return dbManager.updateRow(connectionId, tableName, row, primaryKeyColumn, primaryKeyValue);
   });
-  electron.ipcMain.handle("delete-row", async (_, { tableName, primaryKeyColumn, primaryKeyValue }) => {
-    return dbManager.deleteRow(tableName, primaryKeyColumn, primaryKeyValue);
+  electron.ipcMain.handle("delete-row", async (_, { connectionId, tableName, primaryKeyColumn, primaryKeyValue }) => {
+    return dbManager.deleteRow(connectionId, tableName, primaryKeyColumn, primaryKeyValue);
   });
-  electron.ipcMain.handle("create-table", async (_, { tableName, columns }) => {
-    return dbManager.createTable(tableName, columns);
+  electron.ipcMain.handle("create-table", async (_, { connectionId, tableName, columns }) => {
+    return dbManager.createTable(connectionId, tableName, columns);
   });
-  electron.ipcMain.handle("drop-table", async (_, tableName) => {
-    return dbManager.dropTable(tableName);
+  electron.ipcMain.handle("drop-table", async (_, { connectionId, tableName }) => {
+    return dbManager.dropTable(connectionId, tableName);
   });
-  electron.ipcMain.handle("get-table-structure", async (_, tableName) => {
-    return dbManager.getTableStructure(tableName);
+  electron.ipcMain.handle("get-table-structure", async (_, { connectionId, tableName }) => {
+    return dbManager.getTableStructure(connectionId, tableName);
   });
-  electron.ipcMain.handle("update-table-structure", async (_, { tableName, actions }) => {
-    return dbManager.updateTableStructure(tableName, actions);
+  electron.ipcMain.handle("update-table-structure", async (_, { connectionId, tableName, actions }) => {
+    return dbManager.updateTableStructure(connectionId, tableName, actions);
   });
-  electron.ipcMain.handle("execute-query", async (_, query) => {
-    return dbManager.executeQuery(query);
+  electron.ipcMain.handle("execute-query", async (_, { connectionId, query }) => {
+    return dbManager.executeQuery(connectionId, query);
   });
-  electron.ipcMain.handle("list-databases", async () => {
-    return dbManager.listDatabases();
+  electron.ipcMain.handle("list-databases", async (_, connectionId) => {
+    return dbManager.listDatabases(connectionId);
   });
-  electron.ipcMain.handle("create-database", async (_, name) => {
-    return dbManager.createDatabase(name);
+  electron.ipcMain.handle("create-database", async (_, { connectionId, name }) => {
+    return dbManager.createDatabase(connectionId, name);
   });
-  electron.ipcMain.handle("drop-database", async (_, name) => {
-    return dbManager.dropDatabase(name);
+  electron.ipcMain.handle("drop-database", async (_, { connectionId, name }) => {
+    return dbManager.dropDatabase(connectionId, name);
   });
-  electron.ipcMain.handle("switch-database", async (_, name) => {
-    return dbManager.switchDatabase(name);
+  electron.ipcMain.handle("switch-database", async (_, { connectionId, name }) => {
+    return dbManager.switchDatabase(connectionId, name);
   });
-  electron.ipcMain.handle("list-users", async () => {
-    return dbManager.listUsers();
+  electron.ipcMain.handle("list-users", async (_, connectionId) => {
+    return dbManager.listUsers(connectionId);
   });
-  electron.ipcMain.handle("create-user", async (_, user) => {
-    return dbManager.createUser(user);
+  electron.ipcMain.handle("create-user", async (_, { connectionId, user }) => {
+    return dbManager.createUser(connectionId, user);
   });
-  electron.ipcMain.handle("drop-user", async (_, { username, host }) => {
-    return dbManager.dropUser(username, host);
+  electron.ipcMain.handle("drop-user", async (_, { connectionId, username, host }) => {
+    return dbManager.dropUser(connectionId, username, host);
   });
-  electron.ipcMain.handle("update-user", async (_, user) => {
-    return dbManager.updateUser(user);
+  electron.ipcMain.handle("update-user", async (_, { connectionId, user }) => {
+    return dbManager.updateUser(connectionId, user);
   });
   electron.ipcMain.handle("engine-list", async () => {
     return engineController.getInstances();

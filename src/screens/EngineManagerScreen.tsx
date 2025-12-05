@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Layout, Table, Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Progress } from 'antd';
 import { PlusOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
 import { ipc } from '../renderer/ipc';
 
 const { Content } = Layout;
@@ -19,7 +18,7 @@ interface EngineInstance {
 }
 
 interface EngineManagerScreenProps {
-    onConnect?: () => void;
+    onConnect?: (connectionId: string, engineName: string) => void;
 }
 
 const EngineManagerScreen: React.FC<EngineManagerScreenProps> = ({ onConnect }) => {
@@ -31,7 +30,6 @@ const EngineManagerScreen: React.FC<EngineManagerScreenProps> = ({ onConnect }) 
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedType, setSelectedType] = useState<string>('mysql');
   const [form] = Form.useForm();
-  const navigate = useNavigate();
 
   const loadInstances = async () => {
     setLoading(true);
@@ -187,8 +185,7 @@ const EngineManagerScreen: React.FC<EngineManagerScreenProps> = ({ onConnect }) 
           const result = await ipc.connectDatabase(config);
           if (result.success) {
               message.success('Connected!');
-              if (onConnect) onConnect();
-              navigate('/explorer');
+              if (onConnect) onConnect(result.connectionId, record.name);
           } else {
               message.error(`Connection failed: ${result.error}`);
           }
@@ -244,6 +241,7 @@ const EngineManagerScreen: React.FC<EngineManagerScreenProps> = ({ onConnect }) 
                 </Button>
                 <Button 
                   icon={<PauseCircleOutlined />} 
+                  type="primary"
                   danger 
                   onClick={() => handleStop(record.id)}
                 >
@@ -264,6 +262,7 @@ const EngineManagerScreen: React.FC<EngineManagerScreenProps> = ({ onConnect }) 
             icon={<DeleteOutlined />} 
             onClick={() => handleRemove(record.id)}
             disabled={record.status === 'running'}
+            style={{ color: 'var(--foreground)', borderColor: 'var(--foreground)' }}
           >
             Remove
           </Button>

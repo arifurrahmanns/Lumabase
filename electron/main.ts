@@ -82,76 +82,76 @@ app.whenReady().then(() => {
     return dbManager.connect(config);
   });
 
-  ipcMain.handle('list-tables', async () => {
-    return dbManager.listTables();
+  ipcMain.handle('list-tables', async (_, connectionId) => {
+    return dbManager.listTables(connectionId);
   });
 
-  ipcMain.handle('get-table-data', async (_, tableName) => {
-    return dbManager.getTableData(tableName);
+  ipcMain.handle('get-table-data', async (_, { connectionId, tableName }) => {
+    return dbManager.getTableData(connectionId, tableName);
   });
 
-  ipcMain.handle('add-row', async (_, { tableName, row }) => {
-    return dbManager.addRow(tableName, row);
+  ipcMain.handle('add-row', async (_, { connectionId, tableName, row }) => {
+    return dbManager.addRow(connectionId, tableName, row);
   });
 
-  ipcMain.handle('update-row', async (_, { tableName, row, primaryKeyColumn, primaryKeyValue }) => {
-    return dbManager.updateRow(tableName, row, primaryKeyColumn, primaryKeyValue);
+  ipcMain.handle('update-row', async (_, { connectionId, tableName, row, primaryKeyColumn, primaryKeyValue }) => {
+    return dbManager.updateRow(connectionId, tableName, row, primaryKeyColumn, primaryKeyValue);
   });
 
-  ipcMain.handle('delete-row', async (_, { tableName, primaryKeyColumn, primaryKeyValue }) => {
-    return dbManager.deleteRow(tableName, primaryKeyColumn, primaryKeyValue);
+  ipcMain.handle('delete-row', async (_, { connectionId, tableName, primaryKeyColumn, primaryKeyValue }) => {
+    return dbManager.deleteRow(connectionId, tableName, primaryKeyColumn, primaryKeyValue);
   });
 
-  ipcMain.handle('create-table', async (_, { tableName, columns }) => {
-    return dbManager.createTable(tableName, columns);
+  ipcMain.handle('create-table', async (_, { connectionId, tableName, columns }) => {
+    return dbManager.createTable(connectionId, tableName, columns);
   });
 
-  ipcMain.handle('drop-table', async (_, tableName) => {
-    return dbManager.dropTable(tableName);
+  ipcMain.handle('drop-table', async (_, { connectionId, tableName }) => {
+    return dbManager.dropTable(connectionId, tableName);
   });
 
-  ipcMain.handle('get-table-structure', async (_, tableName) => {
-    return dbManager.getTableStructure(tableName);
+  ipcMain.handle('get-table-structure', async (_, { connectionId, tableName }) => {
+    return dbManager.getTableStructure(connectionId, tableName);
   });
 
-  ipcMain.handle('update-table-structure', async (_, { tableName, actions }) => {
-    return dbManager.updateTableStructure(tableName, actions);
+  ipcMain.handle('update-table-structure', async (_, { connectionId, tableName, actions }) => {
+    return dbManager.updateTableStructure(connectionId, tableName, actions);
   });
 
-  ipcMain.handle('execute-query', async (_, query) => {
-    return dbManager.executeQuery(query);
+  ipcMain.handle('execute-query', async (_, { connectionId, query }) => {
+    return dbManager.executeQuery(connectionId, query);
   });
 
-  ipcMain.handle('list-databases', async () => {
-      return dbManager.listDatabases();
+  ipcMain.handle('list-databases', async (_, connectionId) => {
+      return dbManager.listDatabases(connectionId);
   });
 
-  ipcMain.handle('create-database', async (_, name) => {
-      return dbManager.createDatabase(name);
+  ipcMain.handle('create-database', async (_, { connectionId, name }) => {
+      return dbManager.createDatabase(connectionId, name);
   });
 
-  ipcMain.handle('drop-database', async (_, name) => {
-      return dbManager.dropDatabase(name);
+  ipcMain.handle('drop-database', async (_, { connectionId, name }) => {
+      return dbManager.dropDatabase(connectionId, name);
   });
 
-  ipcMain.handle('switch-database', async (_, name) => {
-      return dbManager.switchDatabase(name);
+  ipcMain.handle('switch-database', async (_, { connectionId, name }) => {
+      return dbManager.switchDatabase(connectionId, name);
   });
 
-  ipcMain.handle('list-users', async () => {
-      return dbManager.listUsers();
+  ipcMain.handle('list-users', async (_, connectionId) => {
+      return dbManager.listUsers(connectionId);
   });
 
-  ipcMain.handle('create-user', async (_, user) => {
-      return dbManager.createUser(user);
+  ipcMain.handle('create-user', async (_, { connectionId, user }) => {
+      return dbManager.createUser(connectionId, user);
   });
 
-  ipcMain.handle('drop-user', async (_, { username, host }) => {
-      return dbManager.dropUser(username, host);
+  ipcMain.handle('drop-user', async (_, { connectionId, username, host }) => {
+      return dbManager.dropUser(connectionId, username, host);
   });
 
-  ipcMain.handle('update-user', async (_, user) => {
-      return dbManager.updateUser(user);
+  ipcMain.handle('update-user', async (_, { connectionId, user }) => {
+      return dbManager.updateUser(connectionId, user);
   });
 
   // Engine Manager IPC

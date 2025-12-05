@@ -6,9 +6,10 @@ import { ipc } from '../renderer/ipc';
 interface Props {
   visible: boolean;
   onCancel: () => void;
+  connectionId: string;
 }
 
-const UserManagementModal: React.FC<Props> = ({ visible, onCancel }) => {
+const UserManagementModal: React.FC<Props> = ({ visible, onCancel, connectionId }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
@@ -25,8 +26,9 @@ const UserManagementModal: React.FC<Props> = ({ visible, onCancel }) => {
 
   const loadUsers = async () => {
     setLoading(true);
+    setLoading(true);
     try {
-      const list = await ipc.listUsers();
+      const list = await ipc.listUsers(connectionId);
       setUsers(list);
     } catch (e: any) {
       message.error(`Failed to load users: ${e.message}`);
@@ -37,7 +39,7 @@ const UserManagementModal: React.FC<Props> = ({ visible, onCancel }) => {
 
   const handleCreateUser = async (values: any) => {
     try {
-      await ipc.createUser(values);
+      await ipc.createUser(connectionId, values);
       message.success('User created');
       setIsAddModalVisible(false);
       form.resetFields();
@@ -49,7 +51,7 @@ const UserManagementModal: React.FC<Props> = ({ visible, onCancel }) => {
 
   const handleDeleteUser = async (user: any) => {
     try {
-      await ipc.dropUser(user.username, user.host);
+      await ipc.dropUser(connectionId, user.username, user.host);
       message.success('User deleted');
       loadUsers();
     } catch (e: any) {
@@ -59,7 +61,7 @@ const UserManagementModal: React.FC<Props> = ({ visible, onCancel }) => {
 
   const handleUpdateUser = async (values: any) => {
       try {
-          await ipc.updateUser({ ...editingUser, ...values });
+          await ipc.updateUser(connectionId, { ...editingUser, ...values });
           message.success('User updated');
           setIsEditModalVisible(false);
           editForm.resetFields();

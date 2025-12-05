@@ -4,6 +4,7 @@ import { message } from 'antd';
 import { buildColumns } from '../utils/columnBuilder';
 
 export const useTableData = (
+    connectionId: string,
     activeTable: string | null,
     onNavigate: (table: string, filter: { field: string; value: any }) => void
 ) => {
@@ -17,8 +18,8 @@ export const useTableData = (
         
         setLoading(true);
         try {
-            const data = await ipc.getTableData(activeTable);
-            const structure = await ipc.getTableStructure(activeTable);
+            const data = await ipc.getTableData(connectionId, activeTable);
+            const structure = await ipc.getTableStructure(connectionId, activeTable);
             
             const cols = await buildColumns(structure, onNavigate);
             
@@ -30,7 +31,7 @@ export const useTableData = (
         } finally {
             setLoading(false);
         }
-    }, [activeTable, onNavigate]);
+    }, [connectionId, activeTable, onNavigate]);
 
     useEffect(() => {
         loadTableData();

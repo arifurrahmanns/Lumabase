@@ -1,39 +1,20 @@
-import React, { useState } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React from 'react';
 import { ConfigProvider, theme } from 'antd';
-import ConnectionScreen from './screens/ConnectionScreen';
-import ExplorerScreen from './screens/ExplorerScreen';
-import EngineManagerScreen from './screens/EngineManagerScreen';
+import TabsLayout from './TabsLayout';
+import '@fontsource/geist-sans';
 
 const App: React.FC = () => {
-  const [isConnected, setIsConnected] = useState(false);
-
   return (
     <ConfigProvider
       theme={{
-        algorithm: theme.darkAlgorithm, // Use dark mode by default for "TablePlus" feel
+        algorithm: theme.darkAlgorithm,
         token: {
-          colorPrimary: '#1890ff',
+          colorPrimary: '#FA541C', // Volcano
+          fontFamily: 'Geist Sans, Inter, sans-serif',
         },
       }}
     >
-      <HashRouter>
-        <Routes>
-          <Route 
-            path="/connect" 
-            element={<ConnectionScreen onConnect={() => setIsConnected(true)} />} 
-          />
-          <Route 
-            path="/engines" 
-            element={<EngineManagerScreen onConnect={() => setIsConnected(true)} />} 
-          />
-          <Route 
-            path="/explorer" 
-            element={isConnected ? <ExplorerScreen /> : <Navigate to="/connect" replace />} 
-          />
-          <Route path="*" element={<Navigate to="/connect" replace />} />
-        </Routes>
-      </HashRouter>
+      <TabsLayout />
     </ConfigProvider>
   );
 };

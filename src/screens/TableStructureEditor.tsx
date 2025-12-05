@@ -8,10 +8,11 @@ interface Props {
   visible: boolean;
   onCancel: () => void;
   tableName: string;
+  connectionId: string;
   onSuccess: () => void;
 }
 
-const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, onSuccess }) => {
+const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, connectionId, onSuccess }) => {
   const [columns, setColumns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
@@ -29,7 +30,7 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, o
   const loadStructure = async () => {
     setLoading(true);
     try {
-      const struct = await ipc.getTableStructure(tableName);
+      const struct = await ipc.getTableStructure(connectionId, tableName);
       setColumns(struct);
     } catch (e) {
       message.error('Failed to load structure');
@@ -41,7 +42,7 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, o
   const handleAddColumn = async (values: any) => {
     setLoading(true);
     try {
-      await ipc.updateTableStructure(tableName, [{
+      await ipc.updateTableStructure(connectionId, tableName, [{
         type: 'add_column',
         column: {
           name: values.name,
@@ -65,7 +66,7 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, o
   const handleDeleteColumn = async (columnName: string) => {
     setLoading(true);
     try {
-      await ipc.updateTableStructure(tableName, [{
+      await ipc.updateTableStructure(connectionId, tableName, [{
         type: 'drop_column',
         columnName: columnName
       }]);
@@ -104,7 +105,7 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, o
       
       // We only support modifying type/null/default, not renaming yet (renaming is complex in some DBs)
       // So we use the original key as the name
-      await ipc.updateTableStructure(tableName, [{
+      await ipc.updateTableStructure(connectionId, tableName, [{
         type: 'modify_column',
         column: {
           name: key, // Keep original name

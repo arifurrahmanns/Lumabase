@@ -10,6 +10,7 @@
     "start": "vite"
   },
   "dependencies": {
+    "@fontsource/geist-sans": "^5.2.5",
     "adm-zip": "^0.5.16",
     "antd": "^5.12.0",
     "axios": "^1.13.2",

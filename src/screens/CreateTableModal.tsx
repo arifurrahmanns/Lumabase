@@ -6,6 +6,7 @@ import { ipc } from '../renderer/ipc';
 interface Props {
   visible: boolean;
   onCancel: () => void;
+  connectionId: string;
   onSuccess: () => void;
 }
 
@@ -19,7 +20,7 @@ interface ColumnDef {
   default?: string;
 }
 
-const CreateTableModal: React.FC<Props> = ({ visible, onCancel, onSuccess }) => {
+const CreateTableModal: React.FC<Props> = ({ visible, onCancel, connectionId, onSuccess }) => {
   const [form] = Form.useForm();
   const [columns, setColumns] = useState<ColumnDef[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,7 +51,7 @@ const CreateTableModal: React.FC<Props> = ({ visible, onCancel, onSuccess }) => 
         return;
       }
       setLoading(true);
-      await ipc.createTable(values.tableName, columns);
+      await ipc.createTable(connectionId, values.tableName, columns);
       message.success(`Table ${values.tableName} created`);
       onSuccess();
       setColumns([]);
