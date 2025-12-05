@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, Select, message, Typography, InputNumber, Divider, Space } from 'antd';
+import { Card, Form, Input, Button, Select, message, Typography, InputNumber, Divider } from 'antd';
 import { DatabaseOutlined } from '@ant-design/icons';
 import { ipc } from '../renderer/ipc';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +15,7 @@ const ConnectionScreen: React.FC<ConnectionScreenProps> = ({ onConnect }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [form] = Form.useForm();
-  const [dbType, setDbType] = useState('mysql');
+  const [_dbType, setDbType] = useState('mysql');
   const [localInstances, setLocalInstances] = useState<any[]>([]);
 
   useEffect(() => {

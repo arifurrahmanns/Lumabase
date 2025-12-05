@@ -49,7 +49,7 @@ app.on('window-all-closed', () => {
   }
 })
 
-app.on('before-quit', async (event) => {
+app.on('before-quit', async (_event) => {
     console.log('App closing, setting quitting flag...');
     // Do NOT stop instances if we want them to persist.
     // Just mark as quitting so we don't overwrite the config with 'stopped'
@@ -165,15 +165,15 @@ app.whenReady().then(() => {
     });
   });
 
-  ipcMain.handle('engine-remove', async (event, id: string) => {
+  ipcMain.handle('engine-remove', async (_event, id: string) => {
     return engineController.removeInstance(id);
   });
 
-  ipcMain.handle('engine-start', async (event, id: string) => {
+  ipcMain.handle('engine-start', async (_event, id: string) => {
     return engineController.startInstance(id);
   });
 
-  ipcMain.handle('engine-stop', async (event, id: string) => {
+  ipcMain.handle('engine-stop', async (_event, id: string) => {
     return engineController.stopInstance(id);
   });
 

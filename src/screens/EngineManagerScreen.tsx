@@ -84,7 +84,7 @@ const EngineManagerScreen: React.FC<EngineManagerScreenProps> = ({ onConnect }) 
       // No need to update paths here anymore, done on submit
   };
 
-  const handleVersionChange = (version: string) => {
+  const handleVersionChange = (_version: string) => {
       // No need to update paths here anymore, done on submit
   };
 

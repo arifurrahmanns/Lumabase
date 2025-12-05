@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Form, Input, Select, Checkbox, Button, Table, Space, message } from 'antd';
+import { Modal, Form, Input, Select, Checkbox, Button, message, Table } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { ipc } from '../renderer/ipc';
 

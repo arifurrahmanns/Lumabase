@@ -2,7 +2,6 @@ import mysql from 'mysql2/promise';
 
 export class MysqlAdapter {
   private connection: mysql.Connection | null = null;
-  private config: any = null;
 
   async connect(config: any) {
     try {
@@ -13,7 +12,6 @@ export class MysqlAdapter {
         password: config.password,
         database: config.database,
       });
-      this.config = config;
       return { success: true };
     } catch (error: any) {
       console.error('MySQL Connection failed:', error);
@@ -25,14 +23,14 @@ export class MysqlAdapter {
     if (!this.connection) throw new Error('Database not connected');
     const [rows] = await this.connection.execute('SHOW TABLES');
     // rows is an array of objects like { 'Tables_in_dbname': 'tablename' }
-    return (rows as any[]).map(row => Object.values(row)[0]);
+    return (rows as any[]).map(row => Object.values(row)[0] as string);
   }
 
   async getTableData(tableName: string) {
     if (!this.connection) throw new Error('Database not connected');
     // WARNING: Vulnerable to SQL injection if tableName is not validated.
     const [rows] = await this.connection.query(`SELECT * FROM \`${tableName}\``);
-    return rows;
+    return rows as any[];
   }
 
   async addRow(tableName: string, row: any) {

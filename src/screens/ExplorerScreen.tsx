@@ -346,7 +346,9 @@ const ExplorerScreen: React.FC<ExplorerScreenProps> = ({ connectionId }) => {
             </>
           ) : (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                 <Empty description="Select a table to view data" />
+            </div>
             </div>
           )}
         </Content>

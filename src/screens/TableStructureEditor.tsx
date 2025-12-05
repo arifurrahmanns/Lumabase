@@ -303,7 +303,8 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
       
       {fkModalVisible && (
         <ForeignKeyModal
-            visible={fkModalVisible}
+            connectionId={connectionId}
+        visible={fkModalVisible}
             onCancel={() => setFkModalVisible(false)}
             tableName={tableName}
             columnName={selectedColumnForFk}

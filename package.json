@@ -1,6 +1,6 @@
 {
   "name": "lumabase",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -8,6 +8,25 @@
     "preview": "vite preview",
     "electron:dev": "vite build && electron .",
     "start": "vite"
+  },
+  "build": {
+    "appId": "com.lumabase.app",
+    "productName": "Lumabase",
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release/${version}"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "dependencies": {
     "@codemirror/lang-sql": "^6.10.0",
@@ -27,9 +46,12 @@
     "tabulator-tables": "^5.5.0"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/better-sqlite3": "^7.6.8",
+    "@types/pg": "^8.15.6",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
+    "@types/react-resizable": "^3.0.8",
     "@vitejs/plugin-react": "^4.2.1",
     "electron": "^28.0.0",
     "electron-builder": "^24.9.1",

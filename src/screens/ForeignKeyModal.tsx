@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Select, Input, Button, message } from 'antd';
+import { Modal, Form, Select, Input, message } from 'antd';
 import { ipc } from '../renderer/ipc';
 
 interface Props {
@@ -8,9 +8,10 @@ interface Props {
   tableName: string;
   columnName: string;
   onSuccess: () => void;
+  connectionId: string;
 }
 
-const ForeignKeyModal: React.FC<Props> = ({ visible, onCancel, tableName, columnName, onSuccess }) => {
+const ForeignKeyModal: React.FC<Props> = ({ visible, onCancel, tableName, columnName, onSuccess, connectionId }) => {
   const [form] = Form.useForm();
   const [tables, setTables] = useState<string[]>([]);
   const [refColumns, setRefColumns] = useState<string[]>([]);
@@ -30,7 +31,7 @@ const ForeignKeyModal: React.FC<Props> = ({ visible, onCancel, tableName, column
 
   const loadTables = async () => {
     try {
-      const list = await ipc.listTables();
+      const list = await ipc.listTables(connectionId);
       setTables(list);
     } catch (e) {
       message.error('Failed to load tables');
@@ -39,7 +40,7 @@ const ForeignKeyModal: React.FC<Props> = ({ visible, onCancel, tableName, column
 
   const handleRefTableChange = async (table: string) => {
     try {
-      const struct = await ipc.getTableStructure(table);
+      const struct = await ipc.getTableStructure(connectionId, table);
       setRefColumns(struct.map((c: any) => c.name));
       form.setFieldsValue({ refColumn: undefined });
     } catch (e) {
@@ -55,7 +56,7 @@ const ForeignKeyModal: React.FC<Props> = ({ visible, onCancel, tableName, column
       // Generate a constraint name if not provided (though we don't ask for it in UI, we should generate one)
       const constraintName = `fk_${tableName}_${columnName}_${Date.now()}`; // Simple unique name
 
-      const results = await ipc.updateTableStructure(tableName, [{
+      const results = await ipc.updateTableStructure(connectionId, tableName, [{
         type: 'add_foreign_key',
         constraintName: constraintName,
         column: columnName,

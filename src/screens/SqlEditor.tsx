@@ -38,7 +38,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ connectionId, initialQuery = '' }
             title: key,
             dataIndex: key,
             key: key,
-            render: (text: any) => {
+            render: (text: string, _record: any) => {
                 if (text === null) return <span style={{ color: '#666', fontStyle: 'italic' }}>NULL</span>;
                 if (typeof text === 'object') return JSON.stringify(text);
                 return String(text);
@@ -101,7 +101,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ connectionId, initialQuery = '' }
             <Table 
                 dataSource={results} 
                 columns={columns} 
-                rowKey={(record, index) => index!.toString()} 
+                rowKey={(_, index) => index!.toString()} 
                 pagination={{ pageSize: 50 }} 
                 size="small"
                 scroll={{ y: 'calc(100vh - 400px)' }} // Adjust scroll height considering editor height

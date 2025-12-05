@@ -22,7 +22,7 @@ export const useTableData = (
             const data = await ipc.getTableData(connectionId, activeTable);
             const structure = await ipc.getTableStructure(connectionId, activeTable);
             
-            const cols = await buildColumns(structure, onNavigate, handleSave);
+            const cols = await buildColumns(structure, onNavigate, handleSave, connectionId);
             
             setColumns(cols);
             setTableData(data);

@@ -27,7 +27,7 @@ export class PostgresAdapter {
     const res = await this.client.query(
       "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
     );
-    return res.rows.map(row => row.table_name);
+    return res.rows.map((row: any) => row.table_name);
   }
 
   async getTableData(tableName: string) {
@@ -41,7 +41,7 @@ export class PostgresAdapter {
     const keys = Object.keys(row);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(',');
     const sql = `INSERT INTO "${tableName}" (${keys.map(k => `"${k}"`).join(',')}) VALUES (${placeholders}) RETURNING *`;
-    const res = await this.client.query(sql, Object.values(row));
+    await this.client.query(sql, Object.values(row));
     // Try to guess ID from returned row if possible, or just return success
     return { success: true };
   }
@@ -92,7 +92,7 @@ export class PostgresAdapter {
       WHERE table_name = $1
     `;
     const res = await this.client.query(sql, [tableName]);
-    return res.rows.map(row => ({
+    return res.rows.map((row: any) => ({
       name: row.column_name,
       type: row.data_type,
       notnull: row.is_nullable === 'NO' ? 1 : 0,
@@ -181,7 +181,7 @@ export class PostgresAdapter {
   async listDatabases() {
       if (!this.client) throw new Error('Database not connected');
       const res = await this.client.query("SELECT datname FROM pg_database WHERE datistemplate = false AND datname != 'postgres'");
-      return res.rows.map(row => row.datname);
+      return res.rows.map((row: any) => row.datname);
   }
 
   async createDatabase(name: string) {
@@ -215,7 +215,7 @@ export class PostgresAdapter {
   async listUsers() {
       if (!this.client) throw new Error('Database not connected');
       const res = await this.client.query('SELECT usename FROM pg_catalog.pg_user');
-      return res.rows.map(row => ({ username: row.usename, host: '%' })); // Postgres users are global usually
+      return res.rows.map((row: any) => ({ username: row.usename, host: '%' })); // Postgres users are global usually
   }
 
   async createUser(user: any) {
@@ -231,7 +231,7 @@ export class PostgresAdapter {
       return { success: true };
   }
 
-  async dropUser(username: string, host?: string) {
+  async dropUser(username: string, _host?: string) {
       if (!this.client) throw new Error('Database not connected');
       if (!/^[a-zA-Z0-9_]+$/.test(username)) throw new Error('Invalid username');
       await this.client.query(`DROP USER "${username}"`);

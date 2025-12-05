@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import { Layout, Tabs, Button } from 'antd';
-import { PlusOutlined, DatabaseOutlined, HomeOutlined } from '@ant-design/icons';
+import { Layout, Tabs } from 'antd';
+import { DatabaseOutlined, HomeOutlined } from '@ant-design/icons';
 import EngineManagerScreen from './screens/EngineManagerScreen';
 import ExplorerScreen from './screens/ExplorerScreen';
-
-const { Content, Sider } = Layout;
 
 interface Tab {
   key: string;
