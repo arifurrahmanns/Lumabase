@@ -1,6 +1,6 @@
 import { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { Layout, Table, Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Progress, Tooltip } from 'antd';
-import { PlusOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons';
+import { PlusOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined, ReloadOutlined, ExportOutlined, EditOutlined } from '@ant-design/icons';
 import { ipc } from '../renderer/ipc';
 
 const { Content } = Layout;
@@ -34,6 +34,8 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedType, setSelectedType] = useState<string>('mysql');
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form] = Form.useForm();
 
   const loadInstances = async () => {
@@ -115,7 +117,26 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
       return { binaryPath, dataDir };
   };
 
-  const handleCreate = async (values: any) => {
+  const handleSave = async (values: any) => {
+    if (isEditMode && editingId) {
+        setLoading(true);
+        try {
+            await ipc.updateEngine(editingId, { port: values.port });
+            message.success('Engine updated successfully');
+            setIsModalVisible(false);
+            setEditingId(null);
+            setIsEditMode(false);
+            form.resetFields();
+            loadInstances();
+        } catch (error: any) {
+            message.error(`Failed to update engine: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+        return;
+    }
+
+    // Create Mode
     // Check for duplicate name
     if (instances.some(i => i.name.toLowerCase() === values.name.toLowerCase())) {
         message.error('Instance name must be unique');
@@ -149,6 +170,19 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
         setLoading(false);
         setIsDownloading(false);
     }
+  };
+
+  const handleEdit = (record: EngineInstance) => {
+      setIsEditMode(true);
+      setEditingId(record.id);
+      form.setFieldsValue({
+          name: record.name,
+          type: record.type,
+          version: record.version,
+          port: record.port
+      });
+      setSelectedType(record.type);
+      setIsModalVisible(true);
   };
 
   const handleStart = async (id: string) => {
@@ -278,6 +312,13 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
                 />
             </Tooltip>
           )}
+          <Tooltip title="Edit">
+            <Button 
+                icon={<EditOutlined />} 
+                onClick={() => handleEdit(record)}
+                disabled={record.status !== 'stopped'}
+            />
+          </Tooltip>
           <Tooltip title="Remove">
               <Button 
                 icon={<DeleteOutlined />} 
@@ -299,7 +340,12 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
           <h1>DB Engine Manager</h1>
           <Space>
             <Button icon={<ReloadOutlined />} onClick={loadInstances}>Refresh</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalVisible(true)}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+                setIsEditMode(false);
+                setEditingId(null);
+                form.resetFields();
+                setIsModalVisible(true);
+            }}>
               Add Instance
             </Button>
           </Space>
@@ -314,23 +360,28 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
         />
 
         <Modal
-          title="Add New Engine Instance"
+          title={isEditMode ? "Edit Engine Instance" : "Add New Engine Instance"}
           open={isModalVisible}
-          onCancel={() => setIsModalVisible(false)}
+          onCancel={() => {
+              setIsModalVisible(false);
+              setIsEditMode(false);
+              setEditingId(null);
+              form.resetFields();
+          }}
           footer={null}
         >
-          <Form form={form} layout="vertical" onFinish={handleCreate} initialValues={{ type: 'mysql', version: '8.0' }}>
+          <Form form={form} layout="vertical" onFinish={handleSave} initialValues={{ type: 'mysql', version: '8.0' }}>
             <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-              <Input placeholder="My Local DB" />
+              <Input placeholder="My Local DB" disabled={isEditMode} />
             </Form.Item>
             <Form.Item name="type" label="Type" rules={[{ required: true }]}>
-              <Select onChange={handleTypeChange}>
+              <Select onChange={handleTypeChange} disabled={isEditMode}>
                 <Option value="mysql">MySQL</Option>
                 <Option value="postgres">PostgreSQL</Option>
               </Select>
             </Form.Item>
             <Form.Item name="version" label="Version" rules={[{ required: true }]}>
-              <Select onChange={handleVersionChange}>
+              <Select onChange={handleVersionChange} disabled={isEditMode}>
                   {selectedType === 'mysql' ? (
                       <>
                         <Option value="8.0">8.0</Option>
@@ -370,7 +421,7 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
 
             <Form.Item>
               <Button type="primary" htmlType="submit" block loading={loading}>
-                Create & Install
+                {isEditMode ? "Save Changes" : "Create & Install"}
               </Button>
             </Form.Item>
           </Form>

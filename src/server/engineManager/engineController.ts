@@ -1,54 +1,59 @@
-import { spawn, ChildProcess, execSync } from 'child_process';
+import { EventEmitter } from 'events';
+import * as fs from 'fs';
+import * as path from 'path';
+import { spawn, execSync, ChildProcess } from 'child_process';
+import treeKill from 'tree-kill';
 import { EngineConfigManager } from './engineConfig';
 import { EngineInstance } from './types';
-import fs from 'fs';
-import path from 'path';
 import { downloadEngine } from './downloader';
-import treeKill from 'tree-kill';
 
-function getPidByPort(port: number): number | null {
-    try {
-        if (process.platform === 'win32') {
-            const output = execSync(`netstat -ano | findstr :${port}`).toString();
-            // Output format: TCP    0.0.0.0:3308           0.0.0.0:0              LISTENING       1234
-            const lines = output.split('\n').filter(l => l.includes('LISTENING'));
-            if (lines.length > 0) {
-                const parts = lines[0].trim().split(/\s+/);
-                const pid = parseInt(parts[parts.length - 1]);
-                return isNaN(pid) ? null : pid;
-            }
-        } else {
-            const output = execSync(`lsof -i :${port} -t`).toString();
-            const pid = parseInt(output.trim());
-            return isNaN(pid) ? null : pid;
+// Helper function to find PID by port
+function getPidByPort(port: number): number | undefined {
+  try {
+    // Windows implementation using netstat
+    if (process.platform === 'win32') {
+      const output = execSync(`netstat -ano | findstr :${port}`, { encoding: 'utf-8' });
+      const lines = output.split('\n');
+      for (const line of lines) {
+        if (line.includes('LISTENING')) {
+          const parts = line.trim().split(/\s+/);
+          return parseInt(parts[parts.length - 1], 10);
         }
-    } catch (e) {
-        // Command failed or no process found
-        return null;
+      }
+    } else {
+      // Linux/Mac implementation using lsof
+      try {
+          const output = execSync(`lsof -i :${port} -t`, { encoding: 'utf-8' });
+          return parseInt(output.trim(), 10);
+      } catch (e) {
+          return undefined; // lsof returns non-zero if no process found
+      }
     }
-    return null;
+  } catch (e) {
+    return undefined;
+  }
 }
 
-export class EngineController {
+export class EngineController extends EventEmitter {
+  private instances: Map<string, EngineInstance>;
+  private runningProcesses: Map<string, ChildProcess>;
   private configManager: EngineConfigManager;
-  private runningProcesses: Map<string, ChildProcess> = new Map();
-  // We keep an in-memory state of instances to track 'running' status and PIDs
-  private instances: Map<string, EngineInstance> = new Map();
   private isQuitting: boolean = false;
 
   constructor() {
+    super();
+    this.instances = new Map();
+    this.runningProcesses = new Map();
     this.configManager = new EngineConfigManager();
     this.loadInstances();
   }
 
   private loadInstances() {
-    const saved = this.configManager.getInstances();
-    console.log('Loading instances from config:', JSON.stringify(saved));
-    saved.forEach(i => {
-      // Check if the process is actually running if we have a PID
+    const instances = this.configManager.getInstances();
+    instances.forEach(i => {
+      // Restore status check
       if (i.pid) {
           try {
-              console.log(`Checking if process ${i.pid} exists for ${i.name}...`);
               // process.kill(pid, 0) throws if process doesn't exist
               process.kill(i.pid, 0);
               i.status = 'running';
@@ -78,7 +83,7 @@ export class EngineController {
                i.status = 'running';
                this.configManager.updateInstance(i.id, { pid: foundPid, status: 'running' });
           } else {
-               console.log(`No PID found for ${i.name}, marking as stopped.`);
+               // console.log(`No PID found for ${i.name}, marking as stopped.`);
                i.status = 'stopped';
           }
       }
@@ -104,15 +109,6 @@ export class EngineController {
             // Determine version from instance or default
             const version = instance.version || (instance.type === 'mysql' ? '8.0' : '14');
             
-            // Construct a dedicated engine dir if not provided or if it looks like a default path
-            // We'll extract to the parent of the bin folder if possible, or just use the base engines dir
-            // Actually, let's use the parent of the binaryPath as the target, 
-            // but binaryPath is what we want to FIND.
-            // The UI sends a binaryPath guess. We should ignore it if we are downloading 
-            // and instead determine the path dynamically.
-            
-            // Let's assume instance.dataDir is .../engines/mysql/8.0/data
-            // So we want to extract to .../engines/mysql/8.0/
             const installDir = path.dirname(instance.dataDir); 
             
             const realBinaryPath = await downloadEngine(
@@ -132,6 +128,7 @@ export class EngineController {
 
     this.configManager.addInstance(instance);
     this.instances.set(instance.id, instance);
+    this.emit('change', this.getInstances());
     return instance;
   }
 
@@ -151,16 +148,9 @@ export class EngineController {
         }
 
         // Attempt to remove the engine directory (parent of dataDir)
-        // This assumes the structure: <base>/<type>/<safeName>/<version>/data
-        // We want to remove <base>/<type>/<safeName>
         if (instance.dataDir) {
             const versionDir = path.dirname(instance.dataDir); // .../<version>
             const instanceDir = path.dirname(versionDir);      // .../<safeName>
-            
-            // Safety check: Ensure we are not deleting the root engines dir or type dir
-            // instanceDir should be at least 2 levels deep from 'engines' (engines/type/instance)
-            // But we don't have easy access to 'engines' root here without config.
-            // Let's just check if it looks like a valid path and not too short.
             
             if (fs.existsSync(instanceDir)) {
                  try {
@@ -174,16 +164,13 @@ export class EngineController {
 
         this.configManager.removeInstance(id);
         this.instances.delete(id);
+        this.emit('change', this.getInstances());
     }
   }
 
   async startInstance(id: string): Promise<void> {
     const instance = this.instances.get(id);
     if (!instance) throw new Error('Instance not found');
-    
-    // If it's already running, we might want to restart it if requested (implicit in "Start" click when already running?)
-    // But usually the UI handles "Stop" then "Start". 
-    // However, if the user sees "Start" but it IS running (e.g. ghost process not detected on load), we should try to kill it.
     
     // Check if port is in use or if we have a ghost PID
     if (instance.status === 'running') {
@@ -214,27 +201,18 @@ export class EngineController {
       let child: ChildProcess;
 
       if (instance.type === 'mysql') {
-        // MySQL Start Logic
-        // mysqld --datadir=<path> --port=<port> --console
-        // Note: User must provide a valid data directory initialized with mysqld --initialize-insecure
-        
-        // Check if data dir exists
-        // Check if binary exists
         if (!fs.existsSync(instance.binaryPath)) {
             throw new Error(`MySQL binary not found at: ${instance.binaryPath}`);
         }
 
-        // Create data dir if not exists
         if (!fs.existsSync(instance.dataDir)) {
              fs.mkdirSync(instance.dataDir, { recursive: true });
         }
 
-        // Check if initialized (look for 'mysql' folder)
         const mysqlDir = path.join(instance.dataDir, 'mysql');
         if (!fs.existsSync(mysqlDir)) {
             console.log(`Initializing MySQL data directory: ${instance.dataDir}`);
             try {
-                // Initialize insecurely (empty root password)
                 execSync(`"${instance.binaryPath}" --initialize-insecure --datadir="${instance.dataDir}"`);
             } catch (e: any) {
                 throw new Error(`Failed to initialize MySQL: ${e.message}`);
@@ -244,33 +222,25 @@ export class EngineController {
         const args = [
           `--datadir=${instance.dataDir}`,
           `--port=${instance.port}`,
-          '--console', // Output to stdout/stderr
-          // '--skip-grant-tables' // Optional: for easy access if needed
+          '--console',
         ];
 
         console.log(`Starting MySQL: ${instance.binaryPath} ${args.join(' ')}`);
         child = spawn(instance.binaryPath, args);
 
       } else if (instance.type === 'postgres') {
-        // PostgreSQL Start Logic
-        // postgres -D <datadir> -p <port>
-        
-        // Check if binary exists
         if (!fs.existsSync(instance.binaryPath)) {
             throw new Error(`Postgres binary not found at: ${instance.binaryPath}`);
         }
 
-        // Create data dir if not exists
         if (!fs.existsSync(instance.dataDir)) {
             fs.mkdirSync(instance.dataDir, { recursive: true });
         }
 
-        // Check if initialized (look for PG_VERSION)
         const pgVersionFile = path.join(instance.dataDir, 'PG_VERSION');
         if (!fs.existsSync(pgVersionFile)) {
              console.log(`Initializing Postgres data directory: ${instance.dataDir}`);
              try {
-                 // Need initdb. Assume it's in the same bin directory as postgres
                  const binDir = path.dirname(instance.binaryPath);
                  const initdbPath = path.join(binDir, process.platform === 'win32' ? 'initdb.exe' : 'initdb');
                  
@@ -296,7 +266,7 @@ export class EngineController {
       }
 
       this.runningProcesses.set(id, child);
-      this.updateStatus(id, 'running', child.pid);
+      this.updateStatus(id, 'running', child.pid, Date.now());
 
       child.stdout?.on('data', (data) => {
         console.log(`[${instance.name}] stdout: ${data}`);
@@ -367,14 +337,43 @@ export class EngineController {
       this.isQuitting = true;
   }
 
-  private updateStatus(id: string, status: EngineInstance['status'], pid?: number) {
+  private updateStatus(id: string, status: EngineInstance['status'], pid?: number, lastStartedAt?: number) {
     const instance = this.instances.get(id);
     if (instance) {
       instance.status = status;
       instance.pid = pid;
+      if (lastStartedAt) instance.lastStartedAt = lastStartedAt;
       this.instances.set(id, instance);
       // Persist to config
-      this.configManager.updateInstance(id, { status, pid });
+      this.configManager.updateInstance(id, { status, pid, lastStartedAt });
+      this.emit('change', this.getInstances());
     }
+  }
+
+  updateInstanceConfig(id: string, updates: Partial<EngineInstance>) {
+    const instance = this.instances.get(id);
+    if (!instance) {
+        throw new Error('Instance not found');
+    }
+
+    if (instance.status === 'running' || instance.status === 'starting') {
+        throw new Error('Cannot update configuration while engine is running. Please stop it first.');
+    }
+
+    // Validate updates
+    if (updates.port) {
+        // basic range check
+        if (updates.port < 1024 || updates.port > 65535) {
+            throw new Error('Port must be between 1024 and 65535');
+        }
+    }
+
+    // Apply updates
+    const updatedInstance = { ...instance, ...updates };
+    this.instances.set(id, updatedInstance);
+    this.configManager.updateInstance(id, updates);
+    this.emit('change', this.getInstances());
+    
+    return updatedInstance;
   }
 }

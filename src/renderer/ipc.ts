@@ -28,6 +28,7 @@ export const ipc = {
   removeEngine: (id: string) => window.electron.ipcRenderer.invoke('engine-remove', id),
   startEngine: (id: string) => window.electron.ipcRenderer.invoke('engine-start', id),
   stopEngine: (id: string) => window.electron.ipcRenderer.invoke('engine-stop', id),
+  updateEngine: (id: string, updates: any) => window.electron.ipcRenderer.invoke('engine-update', { id, updates }),
   getDefaultEnginePaths: () => window.electron.ipcRenderer.invoke('get-default-engine-paths'),
   onDownloadProgress: (callback: (percent: number) => void) => window.electron.ipcRenderer.on('engine-download-progress', (_, percent) => callback(percent)),
   
@@ -35,6 +36,15 @@ export const ipc = {
   minimizeWindow: () => window.electron.ipcRenderer.invoke('window-minimize'),
   maximizeWindow: () => window.electron.ipcRenderer.invoke('window-maximize'),
   closeWindow: () => window.electron.ipcRenderer.invoke('window-close'),
+  
+  // App Settings
+  getAppSettings: () => window.electron.ipcRenderer.invoke('get-app-settings'),
+  setStartOnLogin: (openAtLogin: boolean) => window.electron.ipcRenderer.invoke('set-start-on-login', openAtLogin),
+  setShowInTaskbar: (show: boolean) => window.electron.ipcRenderer.invoke('set-show-in-taskbar', show),
+  setShowInTray: (show: boolean) => window.electron.ipcRenderer.invoke('set-show-in-tray', show),
+  getEngines: () => window.electron.ipcRenderer.invoke('engine-list'), // Alias for consistency
+  openApp: () => window.electron.ipcRenderer.invoke('app-open'),
+  quitApp: () => window.electron.ipcRenderer.invoke('app-quit'),
 };
 
 // Type definition for window.electron

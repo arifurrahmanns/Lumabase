@@ -1,6 +1,8 @@
 import React from 'react';
 import { ConfigProvider, theme } from 'antd';
 import TabsLayout from './TabsLayout';
+import TrayWindow from './screens/TrayWindow';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import '@fontsource/geist-sans';
 
 const App: React.FC = () => {
@@ -14,7 +16,12 @@ const App: React.FC = () => {
         },
       }}
     >
-      <TabsLayout />
+      <HashRouter>
+        <Routes>
+          <Route path="/" element={<TabsLayout />} />
+          <Route path="/tray" element={<TrayWindow />} />
+        </Routes>
+      </HashRouter>
     </ConfigProvider>
   );
 };

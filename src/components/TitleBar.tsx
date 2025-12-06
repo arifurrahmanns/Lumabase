@@ -18,6 +18,22 @@ interface TitleBarProps {
 
 const TitleBar: React.FC<TitleBarProps> = ({ onAddTab, onRefresh, refreshDisabled }) => {
     // const { token } = theme.useToken(); // Unused for now
+    const [startOnLogin, setStartOnLogin] = React.useState(false);
+    const [showInTray, setShowInTray] = React.useState(true);
+
+    React.useEffect(() => {
+        // Load initial settings
+        ipc.getAppSettings().then((settings: any) => {
+            setStartOnLogin(settings.startOnLogin);
+            setShowInTray(settings.showInTray);
+        });
+    }, []);
+
+    const handleStartOnLoginChange = (e: any) => {
+        const newVal = e.target.checked;
+        setStartOnLogin(newVal);
+        ipc.setStartOnLogin(newVal);
+    };
 
     return (
         <div style={{
@@ -48,8 +64,24 @@ const TitleBar: React.FC<TitleBarProps> = ({ onAddTab, onRefresh, refreshDisable
             {/* Config & Window Controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
                  <Space size="middle">
-                    <Checkbox style={{ color: '#aaa' }}>Start on login</Checkbox>
-                    <Checkbox style={{ color: '#aaa' }}>Show in taskbar</Checkbox>
+                    <Checkbox 
+                        style={{ color: '#aaa' }} 
+                        checked={startOnLogin} 
+                        onChange={handleStartOnLoginChange}
+                    >
+                        Start on login
+                    </Checkbox>
+                    <Checkbox 
+                        style={{ color: '#aaa' }} 
+                        checked={showInTray}
+                        onChange={(e) => {
+                            const val = e.target.checked;
+                            setShowInTray(val);
+                            ipc.setShowInTray(val);
+                        }}
+                    >
+                        Show in system tray
+                    </Checkbox>
                  </Space>
                  
                  <Space size={0}>

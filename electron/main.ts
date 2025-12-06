@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from 'electron'
 import path from 'node:path'
 import { dbManager } from '../src/server/db'
 import { EngineController } from '../src/server/engineManager/engineController'
@@ -11,12 +11,13 @@ let win: BrowserWindow | null
 const engineController = new EngineController()
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
+let tray: Tray | null = null;
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1200,
+    width: 1150,
     height: 800,
-    minWidth: 1200,
+    minWidth: 1150,
     minHeight: 700,
     icon: path.join(process.env.VITE_PUBLIC, 'app-icon.png'),
     webPreferences: {
@@ -25,7 +26,7 @@ function createWindow() {
       contextIsolation: true,
     },
     frame: false, // Frameless window
-    titleBarStyle: 'hidden', // Hide title bar but keep traffic lights on macOS if needed, though frame: false usually hides everything on Windows
+    titleBarStyle: 'hidden', // Hide title bar but keep traffic lights on macOS if needed
   })
 
   // Test active push message to Renderer-process.
@@ -96,12 +97,6 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('test-connection', async (_, config) => {
-    // Reuse connect logic but maybe don't keep it persistent? 
-    // For now, simple connect check.
-    // In a real app, we might want to close this connection immediately.
-    // But dbManager.connect stores state. 
-    // Let's assume test-connection just tries to connect and if successful, returns true.
-    // Ideally we'd have a separate test method, but connect works for now.
     return dbManager.connect(config);
   });
 
@@ -142,7 +137,12 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('execute-query', async (_, { connectionId, query }) => {
-    return dbManager.executeQuery(connectionId, query);
+    try {
+        return await dbManager.executeQuery(connectionId, query);
+    } catch (error: any) {
+        console.error('Execute Query Error:', error);
+        throw new Error(error.message || 'Query execution failed');
+    }
   });
 
   ipcMain.handle('list-databases', async (_, connectionId) => {
@@ -200,6 +200,10 @@ app.whenReady().then(() => {
     return engineController.stopInstance(id);
   });
 
+  ipcMain.handle('engine-update', async (_event, { id, updates }: { id: string, updates: Partial<EngineInstance> }) => {
+    return engineController.updateInstanceConfig(id, updates);
+  });
+
   ipcMain.handle('get-default-engine-paths', async () => {
     const userDataPath = app.getPath('userData');
     const enginesPath = path.join(userDataPath, 'engines');
@@ -225,4 +229,135 @@ app.whenReady().then(() => {
   ipcMain.handle('window-close', () => {
     win?.close();
   });
-})
+
+  // Tray Window Management
+  let trayWindow: BrowserWindow | null = null;
+  const iconPath = path.join(process.env.VITE_PUBLIC || '', 'app-icon.png');
+  const icon = nativeImage.createFromPath(iconPath);
+  let showInTray = true;
+
+  const createTrayWindow = () => {
+    trayWindow = new BrowserWindow({
+        width: 240,
+        height: 400, // Adjustable based on content
+        show: false,
+        frame: false,
+        fullscreenable: false,
+        resizable: false,
+        skipTaskbar: true,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            // We need secure implementation, but for MVP local tool:
+            nodeIntegration: false,
+            contextIsolation: true,
+            backgroundThrottling: false
+        }
+    });
+
+    if (VITE_DEV_SERVER_URL) {
+        trayWindow.loadURL(`${VITE_DEV_SERVER_URL}#/tray`);
+    } else {
+        trayWindow.loadFile(path.join(process.env.DIST, 'index.html'), { hash: 'tray' });
+    }
+
+    // Hide on blur
+    trayWindow.on('blur', () => {
+        if (!trayWindow) return;
+        if (!trayWindow.webContents.isDevToolsOpened()) {
+            trayWindow.hide();
+        }
+    });
+  };
+
+  const toggleTrayWindow = () => {
+      if (!trayWindow) createTrayWindow();
+      if (!trayWindow || !tray) return;
+
+      if (trayWindow.isVisible()) {
+          trayWindow.hide();
+      } else {
+          // Calculate position
+          const trayBounds = tray.getBounds();
+          const windowBounds = trayWindow.getBounds();
+          
+          // Basic alignment for bottom taskbar
+          
+          // If tray is at bottom (y > height - 100), show above
+          let newY = trayBounds.y - windowBounds.height;
+          let newX = Math.round(trayBounds.x + (trayBounds.width / 2) - (windowBounds.width / 2));
+
+          if (trayBounds.y < 100) { // Top taskbar
+              newY = trayBounds.y + trayBounds.height;
+          }
+
+          trayWindow.setPosition(newX, newY, false);
+          trayWindow.show();
+          trayWindow.focus();
+      }
+  };
+
+  const createTray = () => {
+      if (tray) return;
+      tray = new Tray(icon.resize({ width: 16, height: 16 }));
+      tray.setToolTip('Lumabase');
+      // Replace context menu with click handler
+      tray.setContextMenu(Menu.buildFromTemplate([])); // Clear native menu
+      tray.on('click', toggleTrayWindow);
+      tray.on('right-click', toggleTrayWindow);
+  };
+
+  const destroyTray = () => {
+      if (tray) {
+          tray.destroy();
+          tray = null;
+      }
+  };
+
+  ipcMain.handle('app-open', () => {
+      if (win) {
+          if (win.isMinimized()) win.restore();
+          win.show();
+          win.focus();
+      } else {
+          createWindow();
+      }
+      trayWindow?.hide();
+  });
+
+  ipcMain.handle('app-quit', () => {
+      engineController.setQuitting();
+      app.quit();
+  });
+
+  // App Settings Updates
+  ipcMain.handle('get-app-settings', () => {
+    return {
+        startOnLogin: app.getLoginItemSettings().openAtLogin,
+        showInTaskbar: true, // Default to true as we are not managing it via tray anymore
+        showInTray: !!tray
+    };
+  });
+
+  ipcMain.handle('set-start-on-login', (_, openAtLogin: boolean) => {
+    app.setLoginItemSettings({
+        openAtLogin,
+        path: app.getPath('exe')
+    });
+  });
+
+  ipcMain.handle('set-show-in-tray', (_, show: boolean) => {
+      showInTray = show;
+      if (show) {
+          createTray();
+      } else {
+          destroyTray();
+      }
+  });
+
+  // Initial Startup
+  createTrayWindow();
+  if (showInTray) {
+      createTray();
+  }
+
+}); // End of app.whenReady

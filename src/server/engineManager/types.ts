@@ -8,6 +8,7 @@ export interface EngineInstance {
   dataDir: string;
   binaryPath: string; // Path to mysqld or postgres executable
   pid?: number;
+  lastStartedAt?: number;
 }
 
 export interface EngineConfig {
