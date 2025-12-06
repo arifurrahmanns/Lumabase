@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, MenuItemConstructorOptions } from 'electron'
 import path from 'node:path'
 import { dbManager } from '../src/server/db'
 import { EngineController } from '../src/server/engineManager/engineController'
@@ -230,80 +230,82 @@ app.whenReady().then(() => {
     win?.close();
   });
 
-  // Tray Window Management
-  let trayWindow: BrowserWindow | null = null;
+  // Tray Management
   const iconPath = path.join(process.env.VITE_PUBLIC || '', 'app-icon.png');
   const icon = nativeImage.createFromPath(iconPath);
   let showInTray = true;
 
-  const createTrayWindow = () => {
-    trayWindow = new BrowserWindow({
-        width: 240,
-        height: 400, // Adjustable based on content
-        show: false,
-        frame: false,
-        fullscreenable: false,
-        resizable: false,
-        skipTaskbar: true,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            // We need secure implementation, but for MVP local tool:
-            nodeIntegration: false,
-            contextIsolation: true,
-            backgroundThrottling: false
-        }
-    });
+  const updateTrayMenu = (instances: EngineInstance[]) => {
+      if (!tray) return;
 
-    if (VITE_DEV_SERVER_URL) {
-        trayWindow.loadURL(`${VITE_DEV_SERVER_URL}#/tray`);
-    } else {
-        trayWindow.loadFile(path.join(process.env.DIST, 'index.html'), { hash: 'tray' });
-    }
-
-    // Hide on blur
-    trayWindow.on('blur', () => {
-        if (!trayWindow) return;
-        if (!trayWindow.webContents.isDevToolsOpened()) {
-            trayWindow.hide();
-        }
-    });
-  };
-
-  const toggleTrayWindow = () => {
-      if (!trayWindow) createTrayWindow();
-      if (!trayWindow || !tray) return;
-
-      if (trayWindow.isVisible()) {
-          trayWindow.hide();
-      } else {
-          // Calculate position
-          const trayBounds = tray.getBounds();
-          const windowBounds = trayWindow.getBounds();
-          
-          // Basic alignment for bottom taskbar
-          
-          // If tray is at bottom (y > height - 100), show above
-          let newY = trayBounds.y - windowBounds.height;
-          let newX = Math.round(trayBounds.x + (trayBounds.width / 2) - (windowBounds.width / 2));
-
-          if (trayBounds.y < 100) { // Top taskbar
-              newY = trayBounds.y + trayBounds.height;
+      const template: MenuItemConstructorOptions[] = [
+          {
+              label: 'Open',
+              click: () => {
+                  if (win) {
+                      if (win.isMinimized()) win.restore();
+                      win.show();
+                      win.focus();
+                  } else {
+                      createWindow();
+                  }
+              }
+          },
+          { type: 'separator' },
+          { label: `Running Engines: ${instances.filter(i => i.status === 'running').length}`, enabled: false },
+           // Dynamic engine items
+           ...instances.map(instance => ({
+              label: `${instance.name} [${instance.port}]`,
+              type: 'checkbox',
+              checked: instance.status === 'running',
+              click: async () => {
+                  try {
+                      if (instance.status === 'running') {
+                          await engineController.stopInstance(instance.id);
+                      } else {
+                          await engineController.startInstance(instance.id);
+                      }
+                  } catch (error: any) {
+                       console.error(`Failed to toggle engine ${instance.name}:`, error);
+                       if (win) {
+                           win.webContents.send('main-process-message', `Error: ${error.message}`);
+                       }
+                  }
+              }
+          } as MenuItemConstructorOptions)),
+          { type: 'separator' },
+          {
+              label: 'Quit',
+              click: () => {
+                  engineController.setQuitting();
+                  app.quit();
+              }
           }
+      ];
 
-          trayWindow.setPosition(newX, newY, false);
-          trayWindow.show();
-          trayWindow.focus();
-      }
+      const contextMenu = Menu.buildFromTemplate(template);
+      tray.setContextMenu(contextMenu);
+      
+      const runningCount = instances.filter(i => i.status === 'running').length;
+      tray.setToolTip(`Lumabase (${runningCount} running)`);
   };
 
   const createTray = () => {
       if (tray) return;
       tray = new Tray(icon.resize({ width: 16, height: 16 }));
       tray.setToolTip('Lumabase');
-      // Replace context menu with click handler
-      tray.setContextMenu(Menu.buildFromTemplate([])); // Clear native menu
-      tray.on('click', toggleTrayWindow);
-      tray.on('right-click', toggleTrayWindow);
+      
+      updateTrayMenu(engineController.getInstances());
+
+      tray.on('double-click', () => {
+           if (win) {
+               if (win.isMinimized()) win.restore();
+               win.show();
+               win.focus();
+           } else {
+               createWindow();
+           }
+      });
   };
 
   const destroyTray = () => {
@@ -313,27 +315,16 @@ app.whenReady().then(() => {
       }
   };
 
-  ipcMain.handle('app-open', () => {
-      if (win) {
-          if (win.isMinimized()) win.restore();
-          win.show();
-          win.focus();
-      } else {
-          createWindow();
-      }
-      trayWindow?.hide();
-  });
-
-  ipcMain.handle('app-quit', () => {
-      engineController.setQuitting();
-      app.quit();
+  // Subscriptions
+  engineController.on('change', (instances) => {
+      updateTrayMenu(instances);
   });
 
   // App Settings Updates
   ipcMain.handle('get-app-settings', () => {
     return {
         startOnLogin: app.getLoginItemSettings().openAtLogin,
-        showInTaskbar: true, // Default to true as we are not managing it via tray anymore
+        showInTaskbar: true,
         showInTray: !!tray
     };
   });
@@ -355,7 +346,6 @@ app.whenReady().then(() => {
   });
 
   // Initial Startup
-  createTrayWindow();
   if (showInTray) {
       createTray();
   }
