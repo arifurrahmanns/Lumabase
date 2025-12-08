@@ -650,20 +650,20 @@ function buildProcessTree(parentPid, tree, pidsToProcess, spawnChildProcessesLis
   ps.on("close", onClose);
 }
 const treeKill$1 = /* @__PURE__ */ getDefaultExportFromCjs(treeKill);
-const CONFIG_FILENAME = "engines.json";
-const getConfigPath = () => path$1.join(electron.app.getPath("userData"), CONFIG_FILENAME);
-const DEFAULT_CONFIG = {
+const CONFIG_FILENAME$1 = "engines.json";
+const getConfigPath$1 = () => path$1.join(electron.app.getPath("userData"), CONFIG_FILENAME$1);
+const DEFAULT_CONFIG$1 = {
   instances: []
 };
 class EngineConfigManager {
   constructor() {
     __publicField(this, "configPath");
-    this.configPath = getConfigPath();
+    this.configPath = getConfigPath$1();
     this.ensureConfig();
   }
   ensureConfig() {
     if (!fs$1.existsSync(this.configPath)) {
-      this.saveConfig(DEFAULT_CONFIG);
+      this.saveConfig(DEFAULT_CONFIG$1);
     }
   }
   readConfig() {
@@ -672,7 +672,7 @@ class EngineConfigManager {
       return JSON.parse(data);
     } catch (error) {
       console.error("Failed to read engine config:", error);
-      return DEFAULT_CONFIG;
+      return DEFAULT_CONFIG$1;
     }
   }
   saveConfig(config2) {
@@ -12370,7 +12370,14 @@ var _eval = EvalError;
 var range = RangeError;
 var ref = ReferenceError;
 var syntax = SyntaxError;
-var type = TypeError;
+var type;
+var hasRequiredType;
+function requireType() {
+  if (hasRequiredType) return type;
+  hasRequiredType = 1;
+  type = TypeError;
+  return type;
+}
 var uri = URIError;
 var abs$1 = Math.abs;
 var floor$1 = Math.floor;
@@ -12616,7 +12623,7 @@ function requireCallBindApplyHelpers() {
   if (hasRequiredCallBindApplyHelpers) return callBindApplyHelpers;
   hasRequiredCallBindApplyHelpers = 1;
   var bind3 = functionBind;
-  var $TypeError2 = type;
+  var $TypeError2 = requireType();
   var $call2 = requireFunctionCall();
   var $actualApply = requireActualApply();
   callBindApplyHelpers = function callBindBasic(args) {
@@ -12689,7 +12696,7 @@ var $EvalError = _eval;
 var $RangeError = range;
 var $ReferenceError = ref;
 var $SyntaxError = syntax;
-var $TypeError$1 = type;
+var $TypeError$1 = requireType();
 var $URIError = uri;
 var abs = abs$1;
 var floor = floor$1;
@@ -13020,7 +13027,7 @@ var GetIntrinsic2 = getIntrinsic;
 var $defineProperty = GetIntrinsic2("%Object.defineProperty%", true);
 var hasToStringTag = requireShams()();
 var hasOwn$1 = hasown;
-var $TypeError = type;
+var $TypeError = requireType();
 var toStringTag = hasToStringTag ? Symbol.toStringTag : null;
 var esSetTostringtag = function setToStringTag(object, value) {
   var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
@@ -20633,13 +20640,59 @@ class EngineController extends events$1.EventEmitter {
     return updatedInstance;
   }
 }
+const CONFIG_FILENAME = "settings.json";
+const getConfigPath = () => path$1.join(electron.app.getPath("userData"), CONFIG_FILENAME);
+const DEFAULT_CONFIG = {
+  showInTray: true
+};
+class AppSettingsManager {
+  constructor() {
+    __publicField(this, "configPath");
+    this.configPath = getConfigPath();
+    this.ensureConfig();
+  }
+  ensureConfig() {
+    if (!fs$1.existsSync(this.configPath)) {
+      this.saveConfig(DEFAULT_CONFIG);
+    }
+  }
+  readConfig() {
+    try {
+      if (fs$1.existsSync(this.configPath)) {
+        const data = fs$1.readFileSync(this.configPath, "utf-8");
+        return { ...DEFAULT_CONFIG, ...JSON.parse(data) };
+      }
+      return DEFAULT_CONFIG;
+    } catch (error) {
+      console.error("Failed to read app settings:", error);
+      return DEFAULT_CONFIG;
+    }
+  }
+  saveConfig(config2) {
+    try {
+      fs$1.writeFileSync(this.configPath, JSON.stringify(config2, null, 2));
+    } catch (error) {
+      console.error("Failed to save app settings:", error);
+    }
+  }
+  getSettings() {
+    return this.readConfig();
+  }
+  updateSettings(updates) {
+    const config2 = this.readConfig();
+    const newConfig = { ...config2, ...updates };
+    this.saveConfig(newConfig);
+    return newConfig;
+  }
+}
 process.env.DIST = path$2.join(__dirname, "../dist");
 process.env.VITE_PUBLIC = electron.app.isPackaged ? process.env.DIST : path$2.join(process.env.DIST, "../public");
 let win;
 const engineController = new EngineController();
+const appSettingsManager = new AppSettingsManager();
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 let tray = null;
-let showInTray = true;
+let showInTray = appSettingsManager.getSettings().showInTray;
 let isQuitting = false;
 function createWindow() {
   win = new electron.BrowserWindow({
@@ -20916,6 +20969,7 @@ electron.app.whenReady().then(() => {
   });
   electron.ipcMain.handle("set-show-in-tray", (_, show) => {
     showInTray = show;
+    appSettingsManager.updateSettings({ showInTray: show });
     if (show) {
       createTray();
     } else {

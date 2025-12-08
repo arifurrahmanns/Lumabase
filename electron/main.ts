@@ -3,16 +3,18 @@ import path from 'node:path'
 import { dbManager } from '../src/server/db'
 import { EngineController } from '../src/server/engineManager/engineController'
 import { EngineInstance } from '../src/server/engineManager/types'
+import { AppSettingsManager } from '../src/server/appSettings'
 
 process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public')
 
 let win: BrowserWindow | null
 const engineController = new EngineController()
+const appSettingsManager = new AppSettingsManager()
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 let tray: Tray | null = null;
-let showInTray = true;
+let showInTray = appSettingsManager.getSettings().showInTray;
 let isQuitting = false;
 
 function createWindow() {
@@ -365,6 +367,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('set-show-in-tray', (_, show: boolean) => {
       showInTray = show;
+      appSettingsManager.updateSettings({ showInTray: show });
       if (show) {
           createTray();
       } else {
