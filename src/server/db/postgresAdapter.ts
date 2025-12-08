@@ -62,6 +62,27 @@ export class PostgresAdapter {
     return { success: true, changes: res.rowCount };
   }
 
+  async deleteRows(tableName: string, primaryKeyColumn: string, primaryKeyValues: any[]) {
+      if (!this.client) throw new Error('Database not connected');
+      if (primaryKeyValues.length === 0) return { success: true, changes: 0 };
+      
+      const placeholders = primaryKeyValues.map((_, i) => `$${i + 1}`).join(',');
+      const sql = `DELETE FROM "${tableName}" WHERE "${primaryKeyColumn}" IN (${placeholders})`;
+      const res = await this.client.query(sql, primaryKeyValues);
+      return { success: true, changes: res.rowCount };
+  }
+
+  async updateRows(tableName: string, updateCol: string, updateVal: any, pkCol: string, pkVals: any[]) {
+      if (!this.client) throw new Error('Database not connected');
+      if (pkVals.length === 0) return { success: true, changes: 0 };
+      
+      // $1 is updateVal, $2...$N are pkVals
+      const placeholders = pkVals.map((_, i) => `$${i + 2}`).join(',');
+      const sql = `UPDATE "${tableName}" SET "${updateCol}" = $1 WHERE "${pkCol}" IN (${placeholders})`;
+      const res = await this.client.query(sql, [updateVal, ...pkVals]);
+      return { success: true, changes: res.rowCount };
+  }
+
   async createTable(tableName: string, columns: any[]) {
     if (!this.client) throw new Error('Database not connected');
     const colDefs = columns.map(col => {

@@ -64,6 +64,30 @@ class DatabaseManager {
   async addRow(connectionId: string, tableName: string, row: any) { return this.getAdapter(connectionId).addRow(tableName, row); }
   async updateRow(connectionId: string, tableName: string, row: any, pkCol: string, pkVal: any) { return this.getAdapter(connectionId).updateRow(tableName, row, pkCol, pkVal); }
   async deleteRow(connectionId: string, tableName: string, pkCol: string, pkVal: any) { return this.getAdapter(connectionId).deleteRow(tableName, pkCol, pkVal); }
+  async deleteRows(connectionId: string, tableName: string, pkCol: string, pkVals: any[]) { 
+      const adapter = this.getAdapter(connectionId);
+      if ((adapter as any).deleteRows) {
+          return (adapter as any).deleteRows(tableName, pkCol, pkVals);
+      }
+      // Fallback
+      for (const val of pkVals) {
+          await adapter.deleteRow(tableName, pkCol, val);
+      }
+      return { success: true, count: pkVals.length };
+  }
+  async updateRows(connectionId: string, tableName: string, updateCol: string, updateVal: any, pkCol: string, pkVals: any[]) {
+      const adapter = this.getAdapter(connectionId);
+      if ((adapter as any).updateRows) {
+          return (adapter as any).updateRows(tableName, updateCol, updateVal, pkCol, pkVals);
+      }
+      // Fallback
+      for (const val of pkVals) {
+         const row: any = {};
+         row[updateCol] = updateVal;
+         await adapter.updateRow(tableName, row, pkCol, val);
+      }
+      return { success: true, count: pkVals.length };
+  }
   async createTable(connectionId: string, tableName: string, columns: any[]) { return this.getAdapter(connectionId).createTable(tableName, columns); }
   async dropTable(connectionId: string, tableName: string) { return this.getAdapter(connectionId).dropTable(tableName); }
   async getTableStructure(connectionId: string, tableName: string) { return this.getAdapter(connectionId).getTableStructure(tableName); }

@@ -58,6 +58,27 @@ export class MysqlAdapter {
     return { success: true, changes: (result as any).affectedRows };
   }
 
+  async deleteRows(tableName: string, primaryKeyColumn: string, primaryKeyValues: any[]) {
+      if (!this.connection) throw new Error('Database not connected');
+      if (primaryKeyValues.length === 0) return { success: true, changes: 0 };
+      
+      const placeholders = primaryKeyValues.map(() => '?').join(',');
+      const sql = `DELETE FROM \`${tableName}\` WHERE \`${primaryKeyColumn}\` IN (${placeholders})`;
+      const [result] = await this.connection.execute(sql, primaryKeyValues);
+      return { success: true, changes: (result as any).affectedRows };
+  }
+
+  async updateRows(tableName: string, updateCol: string, updateVal: any, pkCol: string, pkVals: any[]) {
+      if (!this.connection) throw new Error('Database not connected');
+      if (pkVals.length === 0) return { success: true, changes: 0 };
+      
+      const placeholders = pkVals.map(() => '?').join(',');
+      const sql = `UPDATE \`${tableName}\` SET \`${updateCol}\` = ? WHERE \`${pkCol}\` IN (${placeholders})`;
+      // First arg is updateVal, followed by all pkVals
+      const [result] = await this.connection.execute(sql, [updateVal, ...pkVals]);
+      return { success: true, changes: (result as any).affectedRows };
+  }
+
   async createTable(tableName: string, columns: any[]) {
     if (!this.connection) throw new Error('Database not connected');
     const colDefs = columns.map(col => {

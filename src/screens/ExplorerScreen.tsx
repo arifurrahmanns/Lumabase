@@ -7,6 +7,7 @@ import CreateTableModal from './CreateTableModal';
 import UserManagementModal from './UserManagementModal';
 import SqlEditor from './SqlEditor';
 import LogViewer from './LogViewer';
+import BulkEditModal from './BulkEditModal';
 import { useTableData } from '../hooks/useTableData';
 import { useBatchEditor } from '../hooks/useBatchEditor';
 import ResizableTitle from '../components/ResizableTitle';
@@ -148,6 +149,29 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
   };
 
   const hasSelected = selectedRowKeys.length > 0;
+
+  const [isBulkEditVisible, setIsBulkEditVisible] = useState(false);
+
+  const handleBulkUpdate = async (column: string, value: any) => {
+      const pk = 'id'; // Hardcoded for now
+      try {
+          // Filter out unsaved rows
+          const dbKeys = selectedRowKeys.filter(k => !String(k).startsWith('new_'));
+          
+          if (dbKeys.length > 0) {
+              await ipc.updateRows(connectionId, activeTable!, column, value, pk, dbKeys);
+              message.success(`Updated ${column} for ${dbKeys.length} rows`);
+              loadTableData(); // Refresh to see changes
+              setSelectedRowKeys([]); // Deselect safely
+          } else {
+              message.warning('Only new unsaved rows selected. Edit them manually.');
+          }
+      } catch (e: any) {
+          console.error(e);
+          message.error(`Failed to update: ${e.message}`);
+          throw e; // Modal needs to know it failed
+      }
+  };
 
   const handleBulkDelete = () => {
       if (!selectedRowKeys.length) return;
@@ -524,14 +548,22 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
                     <Button icon={<Plus size={16} />} onClick={handleAddRow}>Add Row</Button>
                     <Button icon={<RefreshCw size={16} />} onClick={handleRefresh}>Refresh</Button>
                     {hasSelected && (
+                        <Space size={8}>
                         <Button 
                             danger 
                             type="primary" 
                             icon={<Trash2 size={16} />} 
                             onClick={handleBulkDelete}
                         >
-                            Delete Selected ({selectedRowKeys.length})
+                            Delete ({selectedRowKeys.length})
                         </Button>
+                        <Button
+                            icon={<Edit size={16} />}
+                            onClick={() => setIsBulkEditVisible(true)}
+                        >
+                            Edit ({selectedRowKeys.length})
+                        </Button>
+                        </Space>
                     )}
                     <Button icon={<Edit size={16} />} onClick={() => setIsStructureModalVisible(true)}>Structure</Button>
                     {pendingFilter && <Button onClick={clearFilter}>Clear Filter</Button>}
@@ -634,6 +666,23 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
           }}
         />
       )}
+
+
+      <BulkEditModal 
+        visible={isBulkEditVisible}
+        columns={structure}
+        selectedCount={selectedRowKeys.length}
+        onCancel={() => setIsBulkEditVisible(false)}
+        onUpdate={handleBulkUpdate}
+      />
+      
+      <BulkEditModal 
+        visible={isBulkEditVisible}
+        columns={structure}
+        selectedCount={selectedRowKeys.length}
+        onCancel={() => setIsBulkEditVisible(false)}
+        onUpdate={handleBulkUpdate}
+      />
 
       <CreateTableModal
         visible={isCreateTableModalVisible}

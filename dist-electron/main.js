@@ -91,6 +91,22 @@ class MysqlAdapter {
     const [result] = await this.connection.execute(sql, [primaryKeyValue]);
     return { success: true, changes: result.affectedRows };
   }
+  async deleteRows(tableName, primaryKeyColumn, primaryKeyValues) {
+    if (!this.connection) throw new Error("Database not connected");
+    if (primaryKeyValues.length === 0) return { success: true, changes: 0 };
+    const placeholders = primaryKeyValues.map(() => "?").join(",");
+    const sql = `DELETE FROM \`${tableName}\` WHERE \`${primaryKeyColumn}\` IN (${placeholders})`;
+    const [result] = await this.connection.execute(sql, primaryKeyValues);
+    return { success: true, changes: result.affectedRows };
+  }
+  async updateRows(tableName, updateCol, updateVal, pkCol, pkVals) {
+    if (!this.connection) throw new Error("Database not connected");
+    if (pkVals.length === 0) return { success: true, changes: 0 };
+    const placeholders = pkVals.map(() => "?").join(",");
+    const sql = `UPDATE \`${tableName}\` SET \`${updateCol}\` = ? WHERE \`${pkCol}\` IN (${placeholders})`;
+    const [result] = await this.connection.execute(sql, [updateVal, ...pkVals]);
+    return { success: true, changes: result.affectedRows };
+  }
   async createTable(tableName, columns) {
     if (!this.connection) throw new Error("Database not connected");
     const colDefs = columns.map((col) => {
@@ -303,6 +319,22 @@ class PostgresAdapter {
     const res = await this.client.query(sql, [primaryKeyValue]);
     return { success: true, changes: res.rowCount };
   }
+  async deleteRows(tableName, primaryKeyColumn, primaryKeyValues) {
+    if (!this.client) throw new Error("Database not connected");
+    if (primaryKeyValues.length === 0) return { success: true, changes: 0 };
+    const placeholders = primaryKeyValues.map((_, i) => `$${i + 1}`).join(",");
+    const sql = `DELETE FROM "${tableName}" WHERE "${primaryKeyColumn}" IN (${placeholders})`;
+    const res = await this.client.query(sql, primaryKeyValues);
+    return { success: true, changes: res.rowCount };
+  }
+  async updateRows(tableName, updateCol, updateVal, pkCol, pkVals) {
+    if (!this.client) throw new Error("Database not connected");
+    if (pkVals.length === 0) return { success: true, changes: 0 };
+    const placeholders = pkVals.map((_, i) => `$${i + 2}`).join(",");
+    const sql = `UPDATE "${tableName}" SET "${updateCol}" = $1 WHERE "${pkCol}" IN (${placeholders})`;
+    const res = await this.client.query(sql, [updateVal, ...pkVals]);
+    return { success: true, changes: res.rowCount };
+  }
   async createTable(tableName, columns) {
     if (!this.client) throw new Error("Database not connected");
     const colDefs = columns.map((col) => {
@@ -508,6 +540,28 @@ class DatabaseManager {
   async deleteRow(connectionId, tableName, pkCol, pkVal) {
     return this.getAdapter(connectionId).deleteRow(tableName, pkCol, pkVal);
   }
+  async deleteRows(connectionId, tableName, pkCol, pkVals) {
+    const adapter = this.getAdapter(connectionId);
+    if (adapter.deleteRows) {
+      return adapter.deleteRows(tableName, pkCol, pkVals);
+    }
+    for (const val of pkVals) {
+      await adapter.deleteRow(tableName, pkCol, val);
+    }
+    return { success: true, count: pkVals.length };
+  }
+  async updateRows(connectionId, tableName, updateCol, updateVal, pkCol, pkVals) {
+    const adapter = this.getAdapter(connectionId);
+    if (adapter.updateRows) {
+      return adapter.updateRows(tableName, updateCol, updateVal, pkCol, pkVals);
+    }
+    for (const val of pkVals) {
+      const row = {};
+      row[updateCol] = updateVal;
+      await adapter.updateRow(tableName, row, pkCol, val);
+    }
+    return { success: true, count: pkVals.length };
+  }
   async createTable(connectionId, tableName, columns) {
     return this.getAdapter(connectionId).createTable(tableName, columns);
   }
@@ -555,7 +609,7 @@ function getDefaultExportFromCjs(x) {
 var childProcess = require$$0$1;
 var spawn = childProcess.spawn;
 var exec = childProcess.exec;
-var treeKill$1 = function(pid, signal, callback) {
+var treeKill = function(pid, signal, callback) {
   if (typeof signal === "function" && callback === void 0) {
     callback = signal;
     signal = void 0;
@@ -650,7 +704,7 @@ function buildProcessTree(parentPid, tree, pidsToProcess, spawnChildProcessesLis
   };
   ps.on("close", onClose);
 }
-const treeKill = /* @__PURE__ */ getDefaultExportFromCjs(treeKill$1);
+const treeKill$1 = /* @__PURE__ */ getDefaultExportFromCjs(treeKill);
 const CONFIG_FILENAME$1 = "engines.json";
 const getConfigPath$1 = () => path$1.join(electron.app.getPath("userData"), CONFIG_FILENAME$1);
 const DEFAULT_CONFIG$1 = {
@@ -13069,9 +13123,9 @@ var asynckit = asynckit$1;
 var setToStringTag2 = esSetTostringtag;
 var hasOwn = hasown;
 var populate = populate$1;
-function FormData$2(options) {
-  if (!(this instanceof FormData$2)) {
-    return new FormData$2(options);
+function FormData$1(options) {
+  if (!(this instanceof FormData$1)) {
+    return new FormData$1(options);
   }
   this._overheadLength = 0;
   this._valueLength = 0;
@@ -13082,10 +13136,10 @@ function FormData$2(options) {
     this[option] = options[option];
   }
 }
-util$1.inherits(FormData$2, CombinedStream);
-FormData$2.LINE_BREAK = "\r\n";
-FormData$2.DEFAULT_CONTENT_TYPE = "application/octet-stream";
-FormData$2.prototype.append = function(field, value, options) {
+util$1.inherits(FormData$1, CombinedStream);
+FormData$1.LINE_BREAK = "\r\n";
+FormData$1.DEFAULT_CONTENT_TYPE = "application/octet-stream";
+FormData$1.prototype.append = function(field, value, options) {
   options = options || {};
   if (typeof options === "string") {
     options = { filename: options };
@@ -13105,7 +13159,7 @@ FormData$2.prototype.append = function(field, value, options) {
   append2(footer);
   this._trackLength(header, value, options);
 };
-FormData$2.prototype._trackLength = function(header, value, options) {
+FormData$1.prototype._trackLength = function(header, value, options) {
   var valueLength = 0;
   if (options.knownLength != null) {
     valueLength += Number(options.knownLength);
@@ -13115,7 +13169,7 @@ FormData$2.prototype._trackLength = function(header, value, options) {
     valueLength = Buffer.byteLength(value);
   }
   this._valueLength += valueLength;
-  this._overheadLength += Buffer.byteLength(header) + FormData$2.LINE_BREAK.length;
+  this._overheadLength += Buffer.byteLength(header) + FormData$1.LINE_BREAK.length;
   if (!value || !value.path && !(value.readable && hasOwn(value, "httpVersion")) && !(value instanceof Stream)) {
     return;
   }
@@ -13123,7 +13177,7 @@ FormData$2.prototype._trackLength = function(header, value, options) {
     this._valuesToMeasure.push(value);
   }
 };
-FormData$2.prototype._lengthRetriever = function(value, callback) {
+FormData$1.prototype._lengthRetriever = function(value, callback) {
   if (hasOwn(value, "fd")) {
     if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
       callback(null, value.end + 1 - (value.start ? value.start : 0));
@@ -13149,7 +13203,7 @@ FormData$2.prototype._lengthRetriever = function(value, callback) {
     callback("Unknown stream");
   }
 };
-FormData$2.prototype._multiPartHeader = function(field, value, options) {
+FormData$1.prototype._multiPartHeader = function(field, value, options) {
   if (typeof options.header === "string") {
     return options.header;
   }
@@ -13176,13 +13230,13 @@ FormData$2.prototype._multiPartHeader = function(field, value, options) {
         header = [header];
       }
       if (header.length) {
-        contents += prop + ": " + header.join("; ") + FormData$2.LINE_BREAK;
+        contents += prop + ": " + header.join("; ") + FormData$1.LINE_BREAK;
       }
     }
   }
-  return "--" + this.getBoundary() + FormData$2.LINE_BREAK + contents + FormData$2.LINE_BREAK;
+  return "--" + this.getBoundary() + FormData$1.LINE_BREAK + contents + FormData$1.LINE_BREAK;
 };
-FormData$2.prototype._getContentDisposition = function(value, options) {
+FormData$1.prototype._getContentDisposition = function(value, options) {
   var filename;
   if (typeof options.filepath === "string") {
     filename = path.normalize(options.filepath).replace(/\\/g, "/");
@@ -13195,7 +13249,7 @@ FormData$2.prototype._getContentDisposition = function(value, options) {
     return 'filename="' + filename + '"';
   }
 };
-FormData$2.prototype._getContentType = function(value, options) {
+FormData$1.prototype._getContentType = function(value, options) {
   var contentType = options.contentType;
   if (!contentType && value && value.name) {
     contentType = mime.lookup(value.name);
@@ -13210,13 +13264,13 @@ FormData$2.prototype._getContentType = function(value, options) {
     contentType = mime.lookup(options.filepath || options.filename);
   }
   if (!contentType && value && typeof value === "object") {
-    contentType = FormData$2.DEFAULT_CONTENT_TYPE;
+    contentType = FormData$1.DEFAULT_CONTENT_TYPE;
   }
   return contentType;
 };
-FormData$2.prototype._multiPartFooter = function() {
+FormData$1.prototype._multiPartFooter = function() {
   return (function(next) {
-    var footer = FormData$2.LINE_BREAK;
+    var footer = FormData$1.LINE_BREAK;
     var lastPart = this._streams.length === 0;
     if (lastPart) {
       footer += this._lastBoundary();
@@ -13224,10 +13278,10 @@ FormData$2.prototype._multiPartFooter = function() {
     next(footer);
   }).bind(this);
 };
-FormData$2.prototype._lastBoundary = function() {
-  return "--" + this.getBoundary() + "--" + FormData$2.LINE_BREAK;
+FormData$1.prototype._lastBoundary = function() {
+  return "--" + this.getBoundary() + "--" + FormData$1.LINE_BREAK;
 };
-FormData$2.prototype.getHeaders = function(userHeaders) {
+FormData$1.prototype.getHeaders = function(userHeaders) {
   var header;
   var formHeaders = {
     "content-type": "multipart/form-data; boundary=" + this.getBoundary()
@@ -13239,19 +13293,19 @@ FormData$2.prototype.getHeaders = function(userHeaders) {
   }
   return formHeaders;
 };
-FormData$2.prototype.setBoundary = function(boundary) {
+FormData$1.prototype.setBoundary = function(boundary) {
   if (typeof boundary !== "string") {
     throw new TypeError("FormData boundary must be a string");
   }
   this._boundary = boundary;
 };
-FormData$2.prototype.getBoundary = function() {
+FormData$1.prototype.getBoundary = function() {
   if (!this._boundary) {
     this._generateBoundary();
   }
   return this._boundary;
 };
-FormData$2.prototype.getBuffer = function() {
+FormData$1.prototype.getBuffer = function() {
   var dataBuffer = new Buffer.alloc(0);
   var boundary = this.getBoundary();
   for (var i = 0, len = this._streams.length; i < len; i++) {
@@ -13262,16 +13316,16 @@ FormData$2.prototype.getBuffer = function() {
         dataBuffer = Buffer.concat([dataBuffer, Buffer.from(this._streams[i])]);
       }
       if (typeof this._streams[i] !== "string" || this._streams[i].substring(2, boundary.length + 2) !== boundary) {
-        dataBuffer = Buffer.concat([dataBuffer, Buffer.from(FormData$2.LINE_BREAK)]);
+        dataBuffer = Buffer.concat([dataBuffer, Buffer.from(FormData$1.LINE_BREAK)]);
       }
     }
   }
   return Buffer.concat([dataBuffer, Buffer.from(this._lastBoundary())]);
 };
-FormData$2.prototype._generateBoundary = function() {
+FormData$1.prototype._generateBoundary = function() {
   this._boundary = "--------------------------" + crypto.randomBytes(12).toString("hex");
 };
-FormData$2.prototype.getLengthSync = function() {
+FormData$1.prototype.getLengthSync = function() {
   var knownLength = this._overheadLength + this._valueLength;
   if (this._streams.length) {
     knownLength += this._lastBoundary().length;
@@ -13281,14 +13335,14 @@ FormData$2.prototype.getLengthSync = function() {
   }
   return knownLength;
 };
-FormData$2.prototype.hasKnownLength = function() {
+FormData$1.prototype.hasKnownLength = function() {
   var hasKnownLength = true;
   if (this._valuesToMeasure.length) {
     hasKnownLength = false;
   }
   return hasKnownLength;
 };
-FormData$2.prototype.getLength = function(cb) {
+FormData$1.prototype.getLength = function(cb) {
   var knownLength = this._overheadLength + this._valueLength;
   if (this._streams.length) {
     knownLength += this._lastBoundary().length;
@@ -13308,7 +13362,7 @@ FormData$2.prototype.getLength = function(cb) {
     cb(null, knownLength);
   });
 };
-FormData$2.prototype.submit = function(params, cb) {
+FormData$1.prototype.submit = function(params, cb) {
   var request;
   var options;
   var defaults2 = { method: "post" };
@@ -13355,19 +13409,19 @@ FormData$2.prototype.submit = function(params, cb) {
   }).bind(this));
   return request;
 };
-FormData$2.prototype._error = function(err) {
+FormData$1.prototype._error = function(err) {
   if (!this.error) {
     this.error = err;
     this.pause();
     this.emit("error", err);
   }
 };
-FormData$2.prototype.toString = function() {
+FormData$1.prototype.toString = function() {
   return "[object FormData]";
 };
-setToStringTag2(FormData$2.prototype, "FormData");
-var form_data = FormData$2;
-const FormData$1 = /* @__PURE__ */ getDefaultExportFromCjs(form_data);
+setToStringTag2(FormData$1.prototype, "FormData");
+var form_data = FormData$1;
+const FormData$2 = /* @__PURE__ */ getDefaultExportFromCjs(form_data);
 function isVisitable(thing) {
   return utils$2.isPlainObject(thing) || utils$2.isArray(thing);
 }
@@ -13391,7 +13445,7 @@ function toFormData$1(obj, formData, options) {
   if (!utils$2.isObject(obj)) {
     throw new TypeError("target must be an object");
   }
-  formData = formData || new (FormData$1 || FormData)();
+  formData = formData || new (FormData$2 || FormData)();
   options = utils$2.toFlatObject(options, {
     metaTokens: true,
     dots: false,
@@ -13627,7 +13681,7 @@ const platform$1 = {
   isNode: true,
   classes: {
     URLSearchParams,
-    FormData: FormData$1,
+    FormData: FormData$2,
     Blob: typeof Blob !== "undefined" && Blob || null
   },
   ALPHABET,
@@ -20588,10 +20642,10 @@ class EngineController extends events$1.EventEmitter {
     if (pidToKill) {
       console.log(`Stopping instance ${id} (PID: ${pidToKill})...`);
       return new Promise((resolve) => {
-        treeKill(pidToKill, "SIGTERM", (err) => {
+        treeKill$1(pidToKill, "SIGTERM", (err) => {
           if (err) {
             console.error(`Failed to kill process ${pidToKill}:`, err);
-            treeKill(pidToKill, "SIGKILL");
+            treeKill$1(pidToKill, "SIGKILL");
           }
           this.runningProcesses.delete(id);
           this.updateStatus(id, "stopped", void 0);
@@ -20799,13 +20853,11 @@ electron.app.whenReady().then(() => {
   electron.ipcMain.handle("delete-row", async (_, { connectionId, tableName, primaryKeyColumn, primaryKeyValue }) => {
     return dbManager.deleteRow(connectionId, tableName, primaryKeyColumn, primaryKeyValue);
   });
+  electron.ipcMain.handle("update-rows", async (_, { connectionId, tableName, updateCol, updateVal, primaryKeyColumn, primaryKeyValues }) => {
+    return dbManager.updateRows(connectionId, tableName, updateCol, updateVal, primaryKeyColumn, primaryKeyValues);
+  });
   electron.ipcMain.handle("delete-rows", async (_, { connectionId, tableName, primaryKeyColumn, primaryKeyValues }) => {
-    try {
-      return dbManager.deleteRows(connectionId, tableName, primaryKeyColumn, primaryKeyValues);
-    } catch (error) {
-      console.error("Bulk delete failed, falling back to individual deletes", error);
-      throw error;
-    }
+    return dbManager.deleteRows(connectionId, tableName, primaryKeyColumn, primaryKeyValues);
   });
   electron.ipcMain.handle("create-table", async (_, { connectionId, tableName, columns }) => {
     return dbManager.createTable(connectionId, tableName, columns);
