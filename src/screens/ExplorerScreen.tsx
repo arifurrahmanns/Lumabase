@@ -20,13 +20,16 @@ const { Sider, Content, Footer } = Layout;
 
 interface ExplorerScreenProps {
     connectionId: string;
+    onOpenDatabase?: (dbName: string) => void;
 }
 
 interface ExplorerScreenRef {
     refresh: () => void;
+    deleteCurrentDatabase?: () => void;
 }
 
-const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ connectionId }, ref) => {
+const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>((props, ref) => {
+  const { connectionId, onOpenDatabase } = props;
   const [tables, setTables] = useState<string[]>([]);
   const [modal, contextHolder] = Modal.useModal();
   const [collapsed, setCollapsed] = useState(false);
@@ -123,13 +126,61 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
 
   // Load tables and dbs on mount or connection change
   useEffect(() => {
-    loadTables();
-    loadDatabases();
-    // Retry once after 500ms to handle race conditions where connection might not be fully ready
-    const timer = setTimeout(() => {
-        loadDatabases();
-    }, 500);
-    return () => clearTimeout(timer);
+    const initDatabaseState = async () => {
+        try {
+            // 1. Get List of DBs
+            const dbs = await ipc.listDatabases(connectionId);
+            setDatabases(dbs);
+
+            // 2. Get Current DB
+            let current = '';
+            try {
+                // Determine DB type by checking list content or catching error? 
+                // Actually, SELECT DATABASE() works in MySQL. 
+                // Postgres uses current_database().
+                // Taking a safe bet: Try MySQL syntax, if it fails/returns key `DATABASE()`, good.
+                // Or better, ipc.listDatabases already tells us if we get `mysql` back it's likely mysql.
+                
+                // Let's use a generic query or check specific known DBs
+                const rows = await ipc.executeQuery(connectionId, 'SELECT DATABASE() as db');
+                if (rows && rows.length > 0) {
+                     // MySQL returns { 'DATABASE()': 'name' } or { db: 'name' } if aliased
+                     // Since we aliased 'as db', it should be 'db'.
+                     current = rows[0].db || Object.values(rows[0])[0]; // Fallback just in case
+                }
+            } catch (e) {
+                // If SELECT DATABASE() fails (e.g. Postgres), try generic fallback or ignore auto-switch for now
+                // Postgres: SELECT current_database();
+                try {
+                     const rows = await ipc.executeQuery(connectionId, 'SELECT current_database() as db');
+                     if (rows && rows.length > 0) current = rows[0].db || Object.values(rows[0])[0];
+                } catch (ignore) {}
+            }
+
+            // 3. Selection Logic
+            const systemDbs = ['information_schema', 'mysql', 'performance_schema', 'sys', 'postgres'];
+            const isSystem = !current || systemDbs.includes(current);
+
+            // If we are on a system DB (default connection), show NOTHING selected.
+            // User must explicitly pick a DB.
+            if (isSystem) {
+                console.log(`System database '${current}' detected. Defaulting to no selection.`);
+                setCurrentDb('');
+                setTables([]);
+            } else {
+                // If we connected directly to a user DB, show it.
+                setCurrentDb(current);
+                const tables = await ipc.listTables(connectionId);
+                setTables(tables);
+            }
+
+        } catch (e: any) {
+            console.error('Failed to init databse state:', e);
+            message.error('Failed to initialize connection: ' + e.message);
+        }
+    };
+    
+    initDatabaseState();
   }, [connectionId]);
 
   // Handle manual refresh
@@ -221,7 +272,14 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
   };
 
   useImperativeHandle(ref, () => ({
-      refresh: handleRefresh
+      refresh: handleRefresh,
+      deleteCurrentDatabase: () => {
+          if (currentDb) {
+              handleDropDatabase(currentDb);
+          } else {
+              message.warning("No database selected to delete.");
+          }
+      }
   }));
 
   const handleResize = (index: number) => (_: any, { size }: any) => {
@@ -435,12 +493,24 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
                     dropdownRender={menu => (
                         <>
                             {menu}
-                            <Button type="text" block icon={<Plus size={16} />} onClick={() => setIsCreateDbModalVisible(true)}>
-                                New Database
-                            </Button>
-                            <Button type="text" block icon={<Edit size={16} />} onClick={() => setIsUserModalVisible(true)}>
-                                Manage Users
-                            </Button>
+                            <div style={{ borderTop: '1px solid var(--border)', padding: '12px 8px 8px', marginTop: 4 }}>
+                                <Button 
+                                    type="primary" 
+                                    block 
+                                    icon={<Plus size={14} />} 
+                                    onClick={() => setIsCreateDbModalVisible(true)}
+                                    style={{ marginBottom: 8 }}
+                                >
+                                    New Database
+                                </Button>
+                                <Button 
+                                    block 
+                                    icon={<Edit size={14} />} 
+                                    onClick={() => setIsUserModalVisible(true)}
+                                >
+                                    Manage Users
+                                </Button>
+                            </div>
                         </>
                     )}
                 >
@@ -453,60 +523,58 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
                     ) : (
                         databases.map(db => (
                             <Select.Option key={db} value={db}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span>{db}</span>
-                                    <Button 
-                                        type="text" 
-                                        size="small" 
-                                        icon={<Trash2 size={16} />} 
-                                        danger
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDropDatabase(db);
-                                        }}
-                                    />
-                                </div>
+                                {db}
                             </Select.Option>
                         ))
                     )}
                 </Select>
             )}
         </div>
-        <div style={{ padding: '0 16px', color: '#888', fontSize: '12px', fontWeight: 'bold' }}>TABLES</div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={viewMode === 'table' && activeTable ? [activeTable] : viewMode === 'sql' ? ['sql-editor'] : []}
-          onClick={(e) => {
-              if (e.key === 'sql-editor') {
-                  setViewMode('sql');
-                  setActiveTable(null);
-                  setPendingFilter(null);
-              } else {
-                  setViewMode('table');
-                  setActiveTable(e.key);
-                  setPendingFilter(null);
-                  setSelectedRowKeys([]);
-              }
-          }}
-          items={[
-              { key: 'sql-editor', icon: <Code size={16} />, label: 'SQL Editor', style: { marginBottom: 8 } },
-              { type: 'divider' },
-              ...tables.map(t => ({ key: t, icon: <TableIcon size={16} />, label: t }))
-          ]}
-        />
+        {currentDb ? (
+            <>
+                <div style={{ padding: '0 16px', color: '#888', fontSize: '12px', fontWeight: 'bold' }}>TABLES</div>
+                <Menu
+                theme="dark"
+                mode="inline"
+                selectedKeys={viewMode === 'table' && activeTable ? [activeTable] : viewMode === 'sql' ? ['sql-editor'] : []}
+                onClick={(e) => {
+                    if (e.key === 'sql-editor') {
+                        setViewMode('sql');
+                        setActiveTable(null);
+                        setPendingFilter(null);
+                    } else {
+                        setViewMode('table');
+                        setActiveTable(e.key);
+                        setPendingFilter(null);
+                        setSelectedRowKeys([]);
+                    }
+                }}
+                items={[
+                    { key: 'sql-editor', icon: <Code size={16} />, label: 'SQL Editor', style: { marginBottom: 8 } },
+                    { type: 'divider' },
+                    ...tables.map(t => ({ key: t, icon: <TableIcon size={16} />, label: t }))
+                ]}
+                />
+            </>
+        ) : (
+             <div style={{ padding: 20, textAlign: 'center', color: '#666', marginTop: 20 }}>
+                 <div>Please select a database to view tables</div>
+             </div>
+        )}
           </div>
-          <div style={{ padding: 16, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'center' }}>
-              <Button 
-                type="dashed" 
-                block={!collapsed} 
-                icon={<Plus size={16} />} 
-                onClick={() => setIsCreateTableModalVisible(true)}
-                title={collapsed ? "New Table" : undefined}
-              >
-                {!collapsed && "New Table"}
-              </Button>
-          </div>
+          {currentDb && (
+            <div style={{ padding: 16, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'center' }}>
+                <Button 
+                    type="dashed" 
+                    block={!collapsed} 
+                    icon={<Plus size={16} />} 
+                    onClick={() => setIsCreateTableModalVisible(true)}
+                    title={collapsed ? "New Table" : undefined}
+                >
+                    {!collapsed && "New Table"}
+                </Button>
+            </div>
+          )}
         </div>
       </Sider>
       <Layout>
@@ -583,7 +651,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
           ) : (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                <Empty description="Select a table to view data" />
+                <Empty description={currentDb ? "Select a table to view data" : "Select a database to continue"} />
             </div>
             </div>
           )}

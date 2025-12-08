@@ -1,5 +1,6 @@
 export const ipc = {
   connectDatabase: (config: any) => window.electron.ipcRenderer.invoke('connect-database', config),
+  cloneConnection: (connectionId: string, newDbName: string) => window.electron.ipcRenderer.invoke('clone-connection', { connectionId, newDbName }),
   testConnection: (config: any) => window.electron.ipcRenderer.invoke('test-connection', config),
   listTables: (connectionId: string) => window.electron.ipcRenderer.invoke('list-tables', connectionId),
   getTableData: (connectionId: string, tableName: string, conditions: any[] = []) => window.electron.ipcRenderer.invoke('get-table-data', { connectionId, tableName, conditions }),

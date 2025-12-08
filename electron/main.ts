@@ -135,6 +135,10 @@ app.whenReady().then(() => {
     return dbManager.connect(config);
   });
 
+  ipcMain.handle('clone-connection', async (_, { connectionId, newDbName }) => {
+    return dbManager.cloneConnection(connectionId, newDbName);
+  });
+
   ipcMain.handle('test-connection', async (_, config) => {
     return dbManager.connect(config);
   });

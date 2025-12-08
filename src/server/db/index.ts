@@ -17,6 +17,7 @@ interface DatabaseAdapter {
   createDatabase(name: string): Promise<any>;
   dropDatabase(name: string): Promise<any>;
   switchDatabase(name: string): Promise<any>;
+  getConfig(): any;
   listUsers(): Promise<any[]>;
   createUser(user: any): Promise<any>;
   dropUser(username: string, host?: string): Promise<any>;
@@ -49,6 +50,21 @@ class DatabaseManager {
     } catch (e) {
         return { success: false, error: e };
     }
+  }
+
+  async cloneConnection(connectionId: string, newDbName: string): Promise<{ success: boolean; connectionId?: string; error?: any }> {
+      try {
+          const adapter = this.getAdapter(connectionId);
+          console.log(`Cloning connection ${connectionId} for db ${newDbName}`);
+          const config = adapter.getConfig();
+          if (!config) throw new Error("Could not retrieve config from adapter");
+
+          const newConfig = { ...config, database: newDbName };
+          return await this.connect(newConfig);
+      } catch (e: any) {
+          console.error('Clone connection failed:', e);
+          return { success: false, error: e.message };
+      }
   }
 
   private getAdapter(connectionId: string) {

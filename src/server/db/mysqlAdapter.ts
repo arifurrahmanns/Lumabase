@@ -2,9 +2,11 @@ import mysql from 'mysql2/promise';
 
 export class MysqlAdapter {
   private connection: mysql.Connection | null = null;
+  private config: any = null;
 
   async connect(config: any) {
     try {
+      this.config = config;
       this.connection = await mysql.createConnection({
         host: config.host,
         port: parseInt(config.port) || 3306,
@@ -17,6 +19,10 @@ export class MysqlAdapter {
       console.error('MySQL Connection failed:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  getConfig() {
+      return this.config;
   }
 
   async listTables() {
@@ -254,8 +260,7 @@ export class MysqlAdapter {
   async listDatabases() {
       if (!this.connection) throw new Error('Database not connected');
       const [rows] = await this.connection.execute('SHOW DATABASES');
-      const systemDbs = ['information_schema', 'mysql', 'performance_schema', 'sys'];
-      return (rows as any[]).map(row => row.Database).filter(db => !systemDbs.includes(db));
+      return (rows as any[]).map(row => row.Database);
   }
 
   async createDatabase(name: string) {

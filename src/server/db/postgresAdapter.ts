@@ -5,21 +5,21 @@ export class PostgresAdapter {
   private config: any = null;
 
   async connect(config: any) {
+    this.config = config;
     try {
       this.client = new Client({
-        host: config.host,
-        port: parseInt(config.port) || 5432,
-        user: config.user,
-        password: config.password,
-        database: config.database,
+        ...config,
+        port: parseInt(config.port) || 5432
       });
       await this.client.connect();
-      this.config = config;
       return { success: true };
     } catch (error: any) {
-      console.error('Postgres Connection failed:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  getConfig() {
+      return this.config;
   }
 
   async listTables() {
@@ -61,7 +61,6 @@ export class PostgresAdapter {
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(',');
     const sql = `INSERT INTO "${tableName}" (${keys.map(k => `"${k}"`).join(',')}) VALUES (${placeholders}) RETURNING *`;
     await this.client.query(sql, Object.values(row));
-    // Try to guess ID from returned row if possible, or just return success
     return { success: true };
   }
 
@@ -191,18 +190,14 @@ export class PostgresAdapter {
       } else if (action.type === 'modify_column') {
         const col = action.column;
         try {
-            // Postgres syntax is different: ALTER COLUMN x TYPE y, ALTER COLUMN x SET/DROP NOT NULL, etc.
-            // Doing it all in one go is tricky. Let's do type first.
             await this.client.query(`ALTER TABLE "${tableName}" ALTER COLUMN "${col.name}" TYPE ${col.type} USING "${col.name}"::${col.type}`);
             
-            // Nullable
             if (!col.nullable) {
                 await this.client.query(`ALTER TABLE "${tableName}" ALTER COLUMN "${col.name}" SET NOT NULL`);
             } else {
                 await this.client.query(`ALTER TABLE "${tableName}" ALTER COLUMN "${col.name}" DROP NOT NULL`);
             }
 
-            // Default
             if (col.default) {
                  await this.client.query(`ALTER TABLE "${tableName}" ALTER COLUMN "${col.name}" SET DEFAULT ${col.default}`);
             } else {
@@ -245,7 +240,8 @@ export class PostgresAdapter {
 
   async listDatabases() {
       if (!this.client) throw new Error('Database not connected');
-      const res = await this.client.query("SELECT datname FROM pg_database WHERE datistemplate = false AND datname != 'postgres'");
+      // Removed check for 'postgres' to allow users to see and select it
+      const res = await this.client.query("SELECT datname FROM pg_database WHERE datistemplate = false");
       return res.rows.map((row: any) => row.datname);
   }
 
@@ -263,16 +259,13 @@ export class PostgresAdapter {
 
   async switchDatabase(name: string) {
       if (!this.client) throw new Error('Database not connected');
-      // Postgres requires reconnection to switch DB
       await this.client.end();
       this.client = new Client({
           ...this.config,
           database: name
       });
       await this.client.connect();
-      // Update config so subsequent reconnects use this DB? 
-      // Or just keep it transient. 
-      // Better to update config in memory
+      // Update config so we know which DB we are on
       this.config.database = name;
       return { success: true };
   }
@@ -280,16 +273,12 @@ export class PostgresAdapter {
   async listUsers() {
       if (!this.client) throw new Error('Database not connected');
       const res = await this.client.query('SELECT usename FROM pg_catalog.pg_user');
-      return res.rows.map((row: any) => ({ username: row.usename, host: '%' })); // Postgres users are global usually
+      return res.rows.map((row: any) => ({ username: row.usename, host: '%' })); 
   }
 
   async createUser(user: any) {
       if (!this.client) throw new Error('Database not connected');
       const { username, password } = user;
-      // Parameterized queries for CREATE USER are tricky in PG, usually need manual escaping or specific utility
-      // For MVP, we'll use simple string interpolation but validate input strictly or use a library helper if available.
-      // PG doesn't support parameters in DDL.
-      // We should sanitize `username`.
       if (!/^[a-zA-Z0-9_]+$/.test(username)) throw new Error('Invalid username');
       
       await this.client.query(`CREATE USER "${username}" WITH PASSWORD '${password}'`);
