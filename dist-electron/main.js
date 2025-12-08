@@ -64,9 +64,22 @@ class MysqlAdapter {
     const [rows] = await this.connection.execute("SHOW TABLES");
     return rows.map((row) => Object.values(row)[0]);
   }
-  async getTableData(tableName) {
+  async getTableData(tableName, conditions = []) {
     if (!this.connection) throw new Error("Database not connected");
-    const [rows] = await this.connection.query(`SELECT * FROM \`${tableName}\``);
+    let sql = `SELECT * FROM \`${tableName}\``;
+    const params = [];
+    if (conditions && conditions.length > 0) {
+      const clauses = conditions.map((cond) => {
+        const op = cond.operator.toUpperCase();
+        const allowedOps = ["=", "!=", "<", ">", "<=", ">=", "LIKE"];
+        if (!allowedOps.includes(op)) throw new Error(`Invalid operator: ${op}`);
+        params.push(cond.value);
+        return `\`${cond.column}\` ${op} ?`;
+      });
+      sql += " WHERE " + clauses.join(" AND ");
+    }
+    sql += " LIMIT 1000";
+    const [rows] = await this.connection.execute(sql, params);
     return rows;
   }
   async addRow(tableName, row) {
@@ -105,6 +118,29 @@ class MysqlAdapter {
     const placeholders = pkVals.map(() => "?").join(",");
     const sql = `UPDATE \`${tableName}\` SET \`${updateCol}\` = ? WHERE \`${pkCol}\` IN (${placeholders})`;
     const [result] = await this.connection.execute(sql, [updateVal, ...pkVals]);
+    return { success: true, changes: result.affectedRows };
+  }
+  async updateRowsByFilter(tableName, updateCol, updateVal, conditions) {
+    if (!this.connection) throw new Error("Database not connected");
+    if (conditions.length === 0) throw new Error('No conditions provided for bulk update. Use "Update All" carefully.');
+    let whereClause = "";
+    const params = [updateVal];
+    conditions.forEach((cond, index) => {
+      const op = cond.operator.toUpperCase();
+      const allowedOps = ["=", "!=", "<", ">", "<=", ">=", "LIKE"];
+      if (!allowedOps.includes(op)) throw new Error(`Invalid operator: ${op}`);
+      whereClause += ` \`${cond.column}\` ${op} ?`;
+    });
+    const clauses = conditions.map((cond) => {
+      const op = cond.operator.toUpperCase();
+      const allowedOps = ["=", "!=", "<", ">", "<=", ">=", "LIKE"];
+      if (!allowedOps.includes(op)) throw new Error(`Invalid operator: ${op}`);
+      params.push(cond.value);
+      return `\`${cond.column}\` ${op} ?`;
+    });
+    whereClause = "WHERE " + clauses.join(" AND ");
+    const sql = `UPDATE \`${tableName}\` SET \`${updateCol}\` = ? ${whereClause}`;
+    const [result] = await this.connection.execute(sql, params);
     return { success: true, changes: result.affectedRows };
   }
   async createTable(tableName, columns) {
@@ -292,9 +328,25 @@ class PostgresAdapter {
     );
     return res.rows.map((row) => row.table_name);
   }
-  async getTableData(tableName) {
+  async getTableData(tableName, conditions = []) {
     if (!this.client) throw new Error("Database not connected");
-    const res = await this.client.query(`SELECT * FROM "${tableName}"`);
+    let sql = `SELECT * FROM "${tableName}"`;
+    const params = [];
+    if (conditions && conditions.length > 0) {
+      let paramIndex = 1;
+      const clauses = conditions.map((cond) => {
+        const op = cond.operator.toUpperCase();
+        const allowedOps = ["=", "!=", "<", ">", "<=", ">=", "LIKE"];
+        if (!allowedOps.includes(op)) throw new Error(`Invalid operator: ${op}`);
+        params.push(cond.value);
+        const clause = `"${cond.column}" ${op} $${paramIndex}`;
+        paramIndex++;
+        return clause;
+      });
+      sql += " WHERE " + clauses.join(" AND ");
+    }
+    sql += " LIMIT 1000";
+    const res = await this.client.query(sql, params);
     return res.rows;
   }
   async addRow(tableName, row) {
@@ -333,6 +385,25 @@ class PostgresAdapter {
     const placeholders = pkVals.map((_, i) => `$${i + 2}`).join(",");
     const sql = `UPDATE "${tableName}" SET "${updateCol}" = $1 WHERE "${pkCol}" IN (${placeholders})`;
     const res = await this.client.query(sql, [updateVal, ...pkVals]);
+    return { success: true, changes: res.rowCount };
+  }
+  async updateRowsByFilter(tableName, updateCol, updateVal, conditions) {
+    if (!this.client) throw new Error("Database not connected");
+    if (conditions.length === 0) throw new Error("No conditions provided");
+    const params = [updateVal];
+    let paramIndex = 2;
+    const clauses = conditions.map((cond) => {
+      const op = cond.operator.toUpperCase();
+      const allowedOps = ["=", "!=", "<", ">", "<=", ">=", "LIKE"];
+      if (!allowedOps.includes(op)) throw new Error(`Invalid operator: ${op}`);
+      params.push(cond.value);
+      const clause = `"${cond.column}" ${op} $${paramIndex}`;
+      paramIndex++;
+      return clause;
+    });
+    const whereClause = "WHERE " + clauses.join(" AND ");
+    const sql = `UPDATE "${tableName}" SET "${updateCol}" = $1 ${whereClause}`;
+    const res = await this.client.query(sql, params);
     return { success: true, changes: res.rowCount };
   }
   async createTable(tableName, columns) {
@@ -528,8 +599,8 @@ class DatabaseManager {
   async listTables(connectionId) {
     return this.getAdapter(connectionId).listTables();
   }
-  async getTableData(connectionId, tableName) {
-    return this.getAdapter(connectionId).getTableData(tableName);
+  async getTableData(connectionId, tableName, conditions = []) {
+    return this.getAdapter(connectionId).getTableData(tableName, conditions);
   }
   async addRow(connectionId, tableName, row) {
     return this.getAdapter(connectionId).addRow(tableName, row);
@@ -561,6 +632,13 @@ class DatabaseManager {
       await adapter.updateRow(tableName, row, pkCol, val);
     }
     return { success: true, count: pkVals.length };
+  }
+  async updateRowsByFilter(connectionId, tableName, updateCol, updateVal, conditions) {
+    const adapter = this.getAdapter(connectionId);
+    if (adapter.updateRowsByFilter) {
+      return adapter.updateRowsByFilter(tableName, updateCol, updateVal, conditions);
+    }
+    throw new Error("This database type does not support filtered bulk updates yet.");
   }
   async createTable(connectionId, tableName, columns) {
     return this.getAdapter(connectionId).createTable(tableName, columns);
@@ -609,7 +687,7 @@ function getDefaultExportFromCjs(x) {
 var childProcess = require$$0$1;
 var spawn = childProcess.spawn;
 var exec = childProcess.exec;
-var treeKill = function(pid, signal, callback) {
+var treeKill$1 = function(pid, signal, callback) {
   if (typeof signal === "function" && callback === void 0) {
     callback = signal;
     signal = void 0;
@@ -704,7 +782,7 @@ function buildProcessTree(parentPid, tree, pidsToProcess, spawnChildProcessesLis
   };
   ps.on("close", onClose);
 }
-const treeKill$1 = /* @__PURE__ */ getDefaultExportFromCjs(treeKill);
+const treeKill = /* @__PURE__ */ getDefaultExportFromCjs(treeKill$1);
 const CONFIG_FILENAME$1 = "engines.json";
 const getConfigPath$1 = () => path$1.join(electron.app.getPath("userData"), CONFIG_FILENAME$1);
 const DEFAULT_CONFIG$1 = {
@@ -12425,14 +12503,7 @@ var _eval = EvalError;
 var range = RangeError;
 var ref = ReferenceError;
 var syntax = SyntaxError;
-var type;
-var hasRequiredType;
-function requireType() {
-  if (hasRequiredType) return type;
-  hasRequiredType = 1;
-  type = TypeError;
-  return type;
-}
+var type = TypeError;
 var uri = URIError;
 var abs$1 = Math.abs;
 var floor$1 = Math.floor;
@@ -12678,7 +12749,7 @@ function requireCallBindApplyHelpers() {
   if (hasRequiredCallBindApplyHelpers) return callBindApplyHelpers;
   hasRequiredCallBindApplyHelpers = 1;
   var bind3 = functionBind;
-  var $TypeError2 = requireType();
+  var $TypeError2 = type;
   var $call2 = requireFunctionCall();
   var $actualApply = requireActualApply();
   callBindApplyHelpers = function callBindBasic(args) {
@@ -12751,7 +12822,7 @@ var $EvalError = _eval;
 var $RangeError = range;
 var $ReferenceError = ref;
 var $SyntaxError = syntax;
-var $TypeError$1 = requireType();
+var $TypeError$1 = type;
 var $URIError = uri;
 var abs = abs$1;
 var floor = floor$1;
@@ -13082,7 +13153,7 @@ var GetIntrinsic2 = getIntrinsic;
 var $defineProperty = GetIntrinsic2("%Object.defineProperty%", true);
 var hasToStringTag = requireShams()();
 var hasOwn$1 = hasown;
-var $TypeError = requireType();
+var $TypeError = type;
 var toStringTag = hasToStringTag ? Symbol.toStringTag : null;
 var esSetTostringtag = function setToStringTag(object, value) {
   var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
@@ -13123,9 +13194,9 @@ var asynckit = asynckit$1;
 var setToStringTag2 = esSetTostringtag;
 var hasOwn = hasown;
 var populate = populate$1;
-function FormData$1(options) {
-  if (!(this instanceof FormData$1)) {
-    return new FormData$1(options);
+function FormData$2(options) {
+  if (!(this instanceof FormData$2)) {
+    return new FormData$2(options);
   }
   this._overheadLength = 0;
   this._valueLength = 0;
@@ -13136,10 +13207,10 @@ function FormData$1(options) {
     this[option] = options[option];
   }
 }
-util$1.inherits(FormData$1, CombinedStream);
-FormData$1.LINE_BREAK = "\r\n";
-FormData$1.DEFAULT_CONTENT_TYPE = "application/octet-stream";
-FormData$1.prototype.append = function(field, value, options) {
+util$1.inherits(FormData$2, CombinedStream);
+FormData$2.LINE_BREAK = "\r\n";
+FormData$2.DEFAULT_CONTENT_TYPE = "application/octet-stream";
+FormData$2.prototype.append = function(field, value, options) {
   options = options || {};
   if (typeof options === "string") {
     options = { filename: options };
@@ -13159,7 +13230,7 @@ FormData$1.prototype.append = function(field, value, options) {
   append2(footer);
   this._trackLength(header, value, options);
 };
-FormData$1.prototype._trackLength = function(header, value, options) {
+FormData$2.prototype._trackLength = function(header, value, options) {
   var valueLength = 0;
   if (options.knownLength != null) {
     valueLength += Number(options.knownLength);
@@ -13169,7 +13240,7 @@ FormData$1.prototype._trackLength = function(header, value, options) {
     valueLength = Buffer.byteLength(value);
   }
   this._valueLength += valueLength;
-  this._overheadLength += Buffer.byteLength(header) + FormData$1.LINE_BREAK.length;
+  this._overheadLength += Buffer.byteLength(header) + FormData$2.LINE_BREAK.length;
   if (!value || !value.path && !(value.readable && hasOwn(value, "httpVersion")) && !(value instanceof Stream)) {
     return;
   }
@@ -13177,7 +13248,7 @@ FormData$1.prototype._trackLength = function(header, value, options) {
     this._valuesToMeasure.push(value);
   }
 };
-FormData$1.prototype._lengthRetriever = function(value, callback) {
+FormData$2.prototype._lengthRetriever = function(value, callback) {
   if (hasOwn(value, "fd")) {
     if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
       callback(null, value.end + 1 - (value.start ? value.start : 0));
@@ -13203,7 +13274,7 @@ FormData$1.prototype._lengthRetriever = function(value, callback) {
     callback("Unknown stream");
   }
 };
-FormData$1.prototype._multiPartHeader = function(field, value, options) {
+FormData$2.prototype._multiPartHeader = function(field, value, options) {
   if (typeof options.header === "string") {
     return options.header;
   }
@@ -13230,13 +13301,13 @@ FormData$1.prototype._multiPartHeader = function(field, value, options) {
         header = [header];
       }
       if (header.length) {
-        contents += prop + ": " + header.join("; ") + FormData$1.LINE_BREAK;
+        contents += prop + ": " + header.join("; ") + FormData$2.LINE_BREAK;
       }
     }
   }
-  return "--" + this.getBoundary() + FormData$1.LINE_BREAK + contents + FormData$1.LINE_BREAK;
+  return "--" + this.getBoundary() + FormData$2.LINE_BREAK + contents + FormData$2.LINE_BREAK;
 };
-FormData$1.prototype._getContentDisposition = function(value, options) {
+FormData$2.prototype._getContentDisposition = function(value, options) {
   var filename;
   if (typeof options.filepath === "string") {
     filename = path.normalize(options.filepath).replace(/\\/g, "/");
@@ -13249,7 +13320,7 @@ FormData$1.prototype._getContentDisposition = function(value, options) {
     return 'filename="' + filename + '"';
   }
 };
-FormData$1.prototype._getContentType = function(value, options) {
+FormData$2.prototype._getContentType = function(value, options) {
   var contentType = options.contentType;
   if (!contentType && value && value.name) {
     contentType = mime.lookup(value.name);
@@ -13264,13 +13335,13 @@ FormData$1.prototype._getContentType = function(value, options) {
     contentType = mime.lookup(options.filepath || options.filename);
   }
   if (!contentType && value && typeof value === "object") {
-    contentType = FormData$1.DEFAULT_CONTENT_TYPE;
+    contentType = FormData$2.DEFAULT_CONTENT_TYPE;
   }
   return contentType;
 };
-FormData$1.prototype._multiPartFooter = function() {
+FormData$2.prototype._multiPartFooter = function() {
   return (function(next) {
-    var footer = FormData$1.LINE_BREAK;
+    var footer = FormData$2.LINE_BREAK;
     var lastPart = this._streams.length === 0;
     if (lastPart) {
       footer += this._lastBoundary();
@@ -13278,10 +13349,10 @@ FormData$1.prototype._multiPartFooter = function() {
     next(footer);
   }).bind(this);
 };
-FormData$1.prototype._lastBoundary = function() {
-  return "--" + this.getBoundary() + "--" + FormData$1.LINE_BREAK;
+FormData$2.prototype._lastBoundary = function() {
+  return "--" + this.getBoundary() + "--" + FormData$2.LINE_BREAK;
 };
-FormData$1.prototype.getHeaders = function(userHeaders) {
+FormData$2.prototype.getHeaders = function(userHeaders) {
   var header;
   var formHeaders = {
     "content-type": "multipart/form-data; boundary=" + this.getBoundary()
@@ -13293,19 +13364,19 @@ FormData$1.prototype.getHeaders = function(userHeaders) {
   }
   return formHeaders;
 };
-FormData$1.prototype.setBoundary = function(boundary) {
+FormData$2.prototype.setBoundary = function(boundary) {
   if (typeof boundary !== "string") {
     throw new TypeError("FormData boundary must be a string");
   }
   this._boundary = boundary;
 };
-FormData$1.prototype.getBoundary = function() {
+FormData$2.prototype.getBoundary = function() {
   if (!this._boundary) {
     this._generateBoundary();
   }
   return this._boundary;
 };
-FormData$1.prototype.getBuffer = function() {
+FormData$2.prototype.getBuffer = function() {
   var dataBuffer = new Buffer.alloc(0);
   var boundary = this.getBoundary();
   for (var i = 0, len = this._streams.length; i < len; i++) {
@@ -13316,16 +13387,16 @@ FormData$1.prototype.getBuffer = function() {
         dataBuffer = Buffer.concat([dataBuffer, Buffer.from(this._streams[i])]);
       }
       if (typeof this._streams[i] !== "string" || this._streams[i].substring(2, boundary.length + 2) !== boundary) {
-        dataBuffer = Buffer.concat([dataBuffer, Buffer.from(FormData$1.LINE_BREAK)]);
+        dataBuffer = Buffer.concat([dataBuffer, Buffer.from(FormData$2.LINE_BREAK)]);
       }
     }
   }
   return Buffer.concat([dataBuffer, Buffer.from(this._lastBoundary())]);
 };
-FormData$1.prototype._generateBoundary = function() {
+FormData$2.prototype._generateBoundary = function() {
   this._boundary = "--------------------------" + crypto.randomBytes(12).toString("hex");
 };
-FormData$1.prototype.getLengthSync = function() {
+FormData$2.prototype.getLengthSync = function() {
   var knownLength = this._overheadLength + this._valueLength;
   if (this._streams.length) {
     knownLength += this._lastBoundary().length;
@@ -13335,14 +13406,14 @@ FormData$1.prototype.getLengthSync = function() {
   }
   return knownLength;
 };
-FormData$1.prototype.hasKnownLength = function() {
+FormData$2.prototype.hasKnownLength = function() {
   var hasKnownLength = true;
   if (this._valuesToMeasure.length) {
     hasKnownLength = false;
   }
   return hasKnownLength;
 };
-FormData$1.prototype.getLength = function(cb) {
+FormData$2.prototype.getLength = function(cb) {
   var knownLength = this._overheadLength + this._valueLength;
   if (this._streams.length) {
     knownLength += this._lastBoundary().length;
@@ -13362,7 +13433,7 @@ FormData$1.prototype.getLength = function(cb) {
     cb(null, knownLength);
   });
 };
-FormData$1.prototype.submit = function(params, cb) {
+FormData$2.prototype.submit = function(params, cb) {
   var request;
   var options;
   var defaults2 = { method: "post" };
@@ -13409,19 +13480,19 @@ FormData$1.prototype.submit = function(params, cb) {
   }).bind(this));
   return request;
 };
-FormData$1.prototype._error = function(err) {
+FormData$2.prototype._error = function(err) {
   if (!this.error) {
     this.error = err;
     this.pause();
     this.emit("error", err);
   }
 };
-FormData$1.prototype.toString = function() {
+FormData$2.prototype.toString = function() {
   return "[object FormData]";
 };
-setToStringTag2(FormData$1.prototype, "FormData");
-var form_data = FormData$1;
-const FormData$2 = /* @__PURE__ */ getDefaultExportFromCjs(form_data);
+setToStringTag2(FormData$2.prototype, "FormData");
+var form_data = FormData$2;
+const FormData$1 = /* @__PURE__ */ getDefaultExportFromCjs(form_data);
 function isVisitable(thing) {
   return utils$2.isPlainObject(thing) || utils$2.isArray(thing);
 }
@@ -13445,7 +13516,7 @@ function toFormData$1(obj, formData, options) {
   if (!utils$2.isObject(obj)) {
     throw new TypeError("target must be an object");
   }
-  formData = formData || new (FormData$2 || FormData)();
+  formData = formData || new (FormData$1 || FormData)();
   options = utils$2.toFlatObject(options, {
     metaTokens: true,
     dots: false,
@@ -13681,7 +13752,7 @@ const platform$1 = {
   isNode: true,
   classes: {
     URLSearchParams,
-    FormData: FormData$2,
+    FormData: FormData$1,
     Blob: typeof Blob !== "undefined" && Blob || null
   },
   ALPHABET,
@@ -20642,10 +20713,10 @@ class EngineController extends events$1.EventEmitter {
     if (pidToKill) {
       console.log(`Stopping instance ${id} (PID: ${pidToKill})...`);
       return new Promise((resolve) => {
-        treeKill$1(pidToKill, "SIGTERM", (err) => {
+        treeKill(pidToKill, "SIGTERM", (err) => {
           if (err) {
             console.error(`Failed to kill process ${pidToKill}:`, err);
-            treeKill$1(pidToKill, "SIGKILL");
+            treeKill(pidToKill, "SIGKILL");
           }
           this.runningProcesses.delete(id);
           this.updateStatus(id, "stopped", void 0);
@@ -20841,8 +20912,8 @@ electron.app.whenReady().then(() => {
   electron.ipcMain.handle("list-tables", async (_, connectionId) => {
     return dbManager.listTables(connectionId);
   });
-  electron.ipcMain.handle("get-table-data", async (_, { connectionId, tableName }) => {
-    return dbManager.getTableData(connectionId, tableName);
+  electron.ipcMain.handle("get-table-data", async (_, { connectionId, tableName, conditions }) => {
+    return dbManager.getTableData(connectionId, tableName, conditions);
   });
   electron.ipcMain.handle("add-row", async (_, { connectionId, tableName, row }) => {
     return dbManager.addRow(connectionId, tableName, row);
@@ -20858,6 +20929,12 @@ electron.app.whenReady().then(() => {
   });
   electron.ipcMain.handle("delete-rows", async (_, { connectionId, tableName, primaryKeyColumn, primaryKeyValues }) => {
     return dbManager.deleteRows(connectionId, tableName, primaryKeyColumn, primaryKeyValues);
+  });
+  electron.ipcMain.handle("update-rows-filter", async (_, { connectionId, tableName, updateCol, updateVal, conditions }) => {
+    return dbManager.updateRowsByFilter(connectionId, tableName, updateCol, updateVal, conditions);
+  });
+  electron.ipcMain.handle("count-rows-filter", async () => {
+    return { count: 0 };
   });
   electron.ipcMain.handle("create-table", async (_, { connectionId, tableName, columns }) => {
     return dbManager.createTable(connectionId, tableName, columns);

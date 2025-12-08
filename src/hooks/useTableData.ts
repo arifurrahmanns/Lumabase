@@ -7,7 +7,8 @@ export const useTableData = (
     connectionId: string,
     activeTable: string | null,
     onNavigate: (table: string, filter: { field: string; value: any }) => void,
-    handleSave: (row: any) => void
+    handleSave: (row: any) => void,
+    conditions: any[] = []
 ) => {
     const [tableData, setTableData] = useState<any[]>([]);
     const [columns, setColumns] = useState<any[]>([]);
@@ -21,7 +22,7 @@ export const useTableData = (
         
         setLoading(true);
         try {
-            const data = await ipc.getTableData(connectionId, activeTable);
+            const data = await ipc.getTableData(connectionId, activeTable, conditions);
             const struct = await ipc.getTableStructure(connectionId, activeTable);
             setStructure(struct);
             
@@ -35,7 +36,7 @@ export const useTableData = (
         } finally {
             setLoading(false);
         }
-    }, [connectionId, activeTable, onNavigate, handleSave]);
+    }, [connectionId, activeTable, onNavigate, handleSave, conditions]);
 
     useEffect(() => {
         loadTableData();

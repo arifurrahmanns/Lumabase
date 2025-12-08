@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Input, InputNumber, DatePicker, Switch, message } from 'antd';
+import { Modal, Form, Select, Input, InputNumber, DatePicker, Radio, Button, Space, message, Row, Col, Tag, Alert } from 'antd';
+import { Plus, Trash2 } from 'lucide-react';
 import dayjs from 'dayjs';
 
 interface BulkEditModalProps {
     visible: boolean;
     columns: any[];
     selectedCount: number;
+    activeFilters?: any[];
     onCancel: () => void;
-    onUpdate: (column: string, value: any) => Promise<void>;
+    onUpdate: (column: string, value: any, mode: 'selection' | 'filter', conditions?: any[]) => Promise<void>;
 }
 
-const BulkEditModal: React.FC<BulkEditModalProps> = ({ visible, columns, selectedCount, onCancel, onUpdate }) => {
+const BulkEditModal: React.FC<BulkEditModalProps> = ({ visible, columns, selectedCount, activeFilters = [], onCancel, onUpdate }) => {
     const [form] = Form.useForm();
+    const [mode, setMode] = useState<'selection' | 'filter'>('selection');
     const [selectedColumn, setSelectedColumn] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
@@ -20,49 +23,48 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({ visible, columns, selecte
         if (visible) {
             form.resetFields();
             setSelectedColumn(null);
+            setMode('selection');
         }
-    }, [visible, form]);
+    }, [visible, form, selectedCount]);
 
     const handleOk = async () => {
         try {
             const values = await form.validateFields();
+            
+
+
             setLoading(true);
             
-            // Format value if needed
             let finalValue = values.value;
-            const colDef = columns.find(c => c.name === values.column);
-            
-            if (colDef) {
-               if (colDef.type.includes('DATE') || colDef.type.includes('TIME')) {
-                 // Ensure valid date string for backend
-                 finalValue = finalValue ? finalValue.format('YYYY-MM-DD HH:mm:ss') : null;
-               }
+            if (dayjs.isDayjs(finalValue)) {
+                finalValue = finalValue.format('YYYY-MM-DD HH:mm:ss');
             }
 
-            await onUpdate(values.column, finalValue);
+            await onUpdate(values.column, finalValue, mode, activeFilters);
             setLoading(false);
-            onCancel(); // Close on success
+            onCancel(); 
         } catch (e) {
             setLoading(false);
-            // Validation error or update error
+            console.error(e);
         }
     };
 
-    const renderInput = () => {
-        if (!selectedColumn) return <Input disabled placeholder="Select a column first" />;
+    const renderInput = (colName: string | null, value: any, onChange?: (val: any) => void) => {
+        if (!colName) return <Input disabled placeholder="Select column" />;
         
-        const col = columns.find(c => c.name === selectedColumn);
+        const col = columns.find(c => c.name === colName);
         if (!col) return <Input />;
 
         const type = col.type.toUpperCase();
+        const props = { style: { width: '100%' }, value, onChange };
 
         if (type.includes('INT') || type.includes('DECIMAL') || type.includes('FLOAT') || type.includes('DOUBLE')) {
-            return <InputNumber style={{ width: '100%' }} />;
+            return <InputNumber {...props} />;
         }
         
         if (type.includes('BOOL') || type.includes('TINYINT(1)')) {
              return (
-                 <Select>
+                 <Select {...props}>
                      <Select.Option value={1}>True / 1</Select.Option>
                      <Select.Option value={0}>False / 0</Select.Option>
                  </Select>
@@ -70,61 +72,68 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({ visible, columns, selecte
         }
 
         if (type.includes('DATE') || type.includes('TIME')) {
-            return <DatePicker showTime={type.includes('DATETIME')} style={{ width: '100%' }} />;
+            return <DatePicker showTime={type.includes('DATETIME')} {...props} />;
         }
         
-        if (type.includes('TEXT') || type.includes('CHAR')) {
-            return <Input.TextArea rows={4} />;
-        }
-
-        return <Input />;
+        return <Input {...props} />; // Text/Char
     };
 
-    const editableColumns = columns.filter(c => !c.autoIncrement && c.name !== 'id'); // Simplify exclusion
+    const editableColumns = columns.filter(c => !c.autoIncrement && c.name !== 'id');
+    const filterableColumns = columns; // All columns can be used in filters
 
     return (
         <Modal
-            title={`Bulk Edit (${selectedCount} rows)`}
+            title="Bulk Edit"
             open={visible}
             onOk={handleOk}
             onCancel={onCancel}
             confirmLoading={loading}
-            okText="Update All"
+            okText={mode === 'selection' ? "Update Selected" : "Update Matching"}
             okButtonProps={{ danger: true }} 
+            width={700}
         >
             <Form form={form} layout="vertical">
-                <Form.Item 
-                    name="column" 
-                    label="Field to Update" 
-                    rules={[{ required: true, message: 'Please select a column' }]}
-                >
-                    <Select 
-                        placeholder="Select Column" 
-                        onChange={setSelectedColumn}
-                        showSearch
-                        optionFilterProp="children"
-                    >
-                        {editableColumns.map(col => (
-                            <Select.Option key={col.name} value={col.name}>
-                                {col.name} <span style={{ color: '#888', fontSize: '0.8em' }}>({col.type})</span>
-                            </Select.Option>
-                        ))}
-                    </Select>
-                </Form.Item>
+                <div style={{ padding: '0 0 16px', fontWeight: 500 }}>
+                    Updating {selectedCount} selected rows
+                </div>
 
-                <Form.Item 
-                    name="value" 
-                    label="New Value"
-                    rules={[{ required: false }]} // Allow null/empty?
-                >
-                    {renderInput()}
-                </Form.Item>
+                <div style={{ borderTop: '1px solid #eee', paddingTop: 16, marginBottom: 16 }}>
+                    <Form.Item 
+                        name="column" 
+                        label="Field to Update" 
+                        rules={[{ required: true, message: 'Please select a column' }]}
+                    >
+                        <Select 
+                            placeholder="Select Column to Modify" 
+                            onChange={setSelectedColumn}
+                            showSearch
+                            optionFilterProp="children"
+                        >
+                            {editableColumns.map(col => (
+                                <Select.Option key={col.name} value={col.name}>
+                                    {col.name} <span style={{ color: '#888', fontSize: '0.8em' }}>({col.type})</span>
+                                </Select.Option>
+                            ))}
+                        </Select>
+                    </Form.Item>
+
+                    <Form.Item 
+                        name="value" 
+                        label="New Value"
+                        rules={[{ required: false }]} 
+                    >
+                        {renderInput(selectedColumn, undefined)}
+                    </Form.Item>
+                </div>
+
+
                 
-                {selectedColumn && (
-                    <div style={{ padding: 12, background: 'rgba(255, 165, 0, 0.1)', border: '1px solid orange', borderRadius: 4, color: 'orange' }}>
-                        Warning: This will overwrite <b>{selectedColumn}</b> for all <b>{selectedCount}</b> selected rows.
-                    </div>
-                )}
+                <div style={{ marginTop: 16, padding: 12, background: 'rgba(255, 165, 0, 0.1)', border: '1px solid orange', borderRadius: 4, color: 'orange' }}>
+                    {mode === 'selection' 
+                        ? `This will update ${selectedColumn || '...'} for ${selectedCount} selected rows.`
+                        : `This will update ${selectedColumn || '...'} for ALL rows matching the conditions.`
+                    }
+                </div>
             </Form>
         </Modal>
     );

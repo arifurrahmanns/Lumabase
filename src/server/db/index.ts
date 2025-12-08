@@ -60,7 +60,7 @@ class DatabaseManager {
   // Proxy methods to the active adapter
   // Proxy methods to the active adapter
   async listTables(connectionId: string) { return this.getAdapter(connectionId).listTables(); }
-  async getTableData(connectionId: string, tableName: string) { return this.getAdapter(connectionId).getTableData(tableName); }
+  async getTableData(connectionId: string, tableName: string, conditions: any[] = []) { return this.getAdapter(connectionId).getTableData(tableName, conditions); }
   async addRow(connectionId: string, tableName: string, row: any) { return this.getAdapter(connectionId).addRow(tableName, row); }
   async updateRow(connectionId: string, tableName: string, row: any, pkCol: string, pkVal: any) { return this.getAdapter(connectionId).updateRow(tableName, row, pkCol, pkVal); }
   async deleteRow(connectionId: string, tableName: string, pkCol: string, pkVal: any) { return this.getAdapter(connectionId).deleteRow(tableName, pkCol, pkVal); }
@@ -87,6 +87,13 @@ class DatabaseManager {
          await adapter.updateRow(tableName, row, pkCol, val);
       }
       return { success: true, count: pkVals.length };
+  }
+  async updateRowsByFilter(connectionId: string, tableName: string, updateCol: string, updateVal: any, conditions: any[]) {
+      const adapter = this.getAdapter(connectionId);
+      if ((adapter as any).updateRowsByFilter) {
+          return (adapter as any).updateRowsByFilter(tableName, updateCol, updateVal, conditions);
+      }
+      throw new Error('This database type does not support filtered bulk updates yet.');
   }
   async createTable(connectionId: string, tableName: string, columns: any[]) { return this.getAdapter(connectionId).createTable(tableName, columns); }
   async dropTable(connectionId: string, tableName: string) { return this.getAdapter(connectionId).dropTable(tableName); }

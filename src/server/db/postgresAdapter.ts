@@ -30,9 +30,28 @@ export class PostgresAdapter {
     return res.rows.map((row: any) => row.table_name);
   }
 
-  async getTableData(tableName: string) {
+  async getTableData(tableName: string, conditions: any[] = []) {
     if (!this.client) throw new Error('Database not connected');
-    const res = await this.client.query(`SELECT * FROM "${tableName}"`);
+    let sql = `SELECT * FROM "${tableName}"`;
+    const params: any[] = [];
+    
+    if (conditions && conditions.length > 0) {
+        let paramIndex = 1;
+        const clauses = conditions.map(cond => {
+             const op = cond.operator.toUpperCase();
+             const allowedOps = ['=', '!=', '<', '>', '<=', '>=', 'LIKE'];
+             if (!allowedOps.includes(op)) throw new Error(`Invalid operator: ${op}`);
+             params.push(cond.value);
+             const clause = `"${cond.column}" ${op} $${paramIndex}`;
+             paramIndex++;
+             return clause;
+        });
+        sql += ' WHERE ' + clauses.join(' AND ');
+    }
+    
+    sql += ' LIMIT 1000';
+
+    const res = await this.client.query(sql, params);
     return res.rows;
   }
 
@@ -80,6 +99,31 @@ export class PostgresAdapter {
       const placeholders = pkVals.map((_, i) => `$${i + 2}`).join(',');
       const sql = `UPDATE "${tableName}" SET "${updateCol}" = $1 WHERE "${pkCol}" IN (${placeholders})`;
       const res = await this.client.query(sql, [updateVal, ...pkVals]);
+      return { success: true, changes: res.rowCount };
+  }
+
+  async updateRowsByFilter(tableName: string, updateCol: string, updateVal: any, conditions: { column: string, operator: string, value: any }[]) {
+      if (!this.client) throw new Error('Database not connected');
+      if (conditions.length === 0) throw new Error('No conditions provided');
+
+      const params = [updateVal];
+      let paramIndex = 2; // Start from $2 (since $1 is updateVal)
+      
+      const clauses = conditions.map(cond => {
+          const op = cond.operator.toUpperCase();
+          const allowedOps = ['=', '!=', '<', '>', '<=', '>=', 'LIKE'];
+          if (!allowedOps.includes(op)) throw new Error(`Invalid operator: ${op}`);
+          
+          params.push(cond.value);
+          const clause = `"${cond.column}" ${op} $${paramIndex}`;
+          paramIndex++;
+          return clause;
+      });
+
+      const whereClause = 'WHERE ' + clauses.join(' AND ');
+      const sql = `UPDATE "${tableName}" SET "${updateCol}" = $1 ${whereClause}`;
+      
+      const res = await this.client.query(sql, params);
       return { success: true, changes: res.rowCount };
   }
 

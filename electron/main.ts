@@ -143,8 +143,8 @@ app.whenReady().then(() => {
     return dbManager.listTables(connectionId);
   });
 
-  ipcMain.handle('get-table-data', async (_, { connectionId, tableName }) => {
-    return dbManager.getTableData(connectionId, tableName);
+  ipcMain.handle('get-table-data', async (_, { connectionId, tableName, conditions }) => {
+    return dbManager.getTableData(connectionId, tableName, conditions);
   });
 
   ipcMain.handle('add-row', async (_, { connectionId, tableName, row }) => {
@@ -166,6 +166,15 @@ app.whenReady().then(() => {
   ipcMain.handle('delete-rows', async (_, { connectionId, tableName, primaryKeyColumn, primaryKeyValues }) => {
      // Now delegating to dbManager properly
      return dbManager.deleteRows(connectionId, tableName, primaryKeyColumn, primaryKeyValues);
+  });
+
+  ipcMain.handle('update-rows-filter', async (_, { connectionId, tableName, updateCol, updateVal, conditions }) => {
+    return dbManager.updateRowsByFilter(connectionId, tableName, updateCol, updateVal, conditions);
+  });
+
+  ipcMain.handle('count-rows-filter', async () => {
+     // Placeholder for "Preview Impact" - return 0 for now until implemented
+     return { count: 0 }; 
   });
 
   ipcMain.handle('create-table', async (_, { connectionId, tableName, columns }) => {

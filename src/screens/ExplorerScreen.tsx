@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { FilterModal } from '../components/FilterModal';
 import { Layout, Menu, Button, Space, Empty, message, Select, Modal, Form, Input, Table, Dropdown, Pagination } from 'antd';
-import { Plus, RefreshCw, Edit, Table as TableIcon, Code, Trash2, Database } from 'lucide-react';
+import { Plus, RefreshCw, Edit, Table as TableIcon, Code, Trash2, Database, Filter } from 'lucide-react';
 import { ipc } from '../renderer/ipc';
 import TableStructureEditor from './TableStructureEditor';
 import CreateTableModal from './CreateTableModal';
@@ -40,6 +41,8 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
   const [isCreateDbModalVisible, setIsCreateDbModalVisible] = useState(false);
   const [isCreateTableModalVisible, setIsCreateTableModalVisible] = useState(false);
   const [isUserModalVisible, setIsUserModalVisible] = useState(false);
+  const [filterConditions, setFilterConditions] = useState<any[]>([]);
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [createDbForm] = Form.useForm();
   
   // Ref to hold latest tableData to avoid dependency cycles
@@ -66,7 +69,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
       setTableData,
       setColumns,
       structure
-  } = useTableData(connectionId, activeTable, handleNavigate, handleRowSaveWrapper);
+  } = useTableData(connectionId, activeTable, handleNavigate, handleRowSaveWrapper, filterConditions);
 
   // Sync Ref with state (must do this early for useBatchEditor to use fresh data if it used ref, but it uses callback)
   useEffect(() => {
@@ -152,24 +155,35 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
 
   const [isBulkEditVisible, setIsBulkEditVisible] = useState(false);
 
-  const handleBulkUpdate = async (column: string, value: any) => {
+  const handleBulkUpdate = async (column: string, value: any, mode: 'selection' | 'filter', conditions?: any[]) => {
       const pk = 'id'; // Hardcoded for now
       try {
-          // Filter out unsaved rows
-          const dbKeys = selectedRowKeys.filter(k => !String(k).startsWith('new_'));
-          
-          if (dbKeys.length > 0) {
-              await ipc.updateRows(connectionId, activeTable!, column, value, pk, dbKeys);
-              message.success(`Updated ${column} for ${dbKeys.length} rows`);
-              loadTableData(); // Refresh to see changes
-              setSelectedRowKeys([]); // Deselect safely
+          if (mode === 'filter') {
+               if (!conditions || conditions.length === 0) {
+                   message.error("No conditions provided for filter update");
+                   return;
+               }
+               const result = await ipc.updateRowsByFilter(connectionId, activeTable!, column, value, conditions);
+               message.success(`Updated ${column} for ${result.changes} rows matching criteria`);
           } else {
-              message.warning('Only new unsaved rows selected. Edit them manually.');
+              // Standard Selection Mode
+              const dbKeys = selectedRowKeys.filter(k => !String(k).startsWith('new_'));
+              
+              if (dbKeys.length > 0) {
+                  await ipc.updateRows(connectionId, activeTable!, column, value, pk, dbKeys);
+                  message.success(`Updated ${column} for ${dbKeys.length} rows`);
+              } else {
+                  message.warning('Only new unsaved rows selected. Edit them manually.');
+                  return;
+              }
           }
+          
+          loadTableData(); 
+          setSelectedRowKeys([]); 
       } catch (e: any) {
           console.error(e);
           message.error(`Failed to update: ${e.message}`);
-          throw e; // Modal needs to know it failed
+          throw e; 
       }
   };
 
@@ -357,54 +371,12 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
       }),
   }));
 
-  const actionColumn = {
-      title: 'Actions',
-      key: 'actions',
-      width: 70,
-      align: 'center' as const,
-      render: (_: any, record: any) => (
-          <Button 
-            type="text" 
-            danger 
-            icon={<Trash2 size={16} />} 
-            onClick={(e) => {
-                e.stopPropagation();
-                // If it's a new unsaved row, just remove from state
-                if (record._isNew) {
-                    const getRowId = (r: any) => r._tempKey || r.id;
-                    setTableData(prev => prev.filter(r => getRowId(r) !== getRowId(record)));
-                    message.success('Removed unsaved row');
-                    return;
-                }
-
-                modal.confirm({
-                    title: 'Delete this row?',
-                    content: 'This action cannot be undone.',
-                    okText: 'Delete',
-                    okType: 'danger',
-                    onOk: async () => {
-                        const pk = 'id'; 
-                        if (record[pk]) {
-                            await ipc.deleteRow(connectionId, activeTable!, pk, record[pk]);
-                            loadTableData(); 
-                            message.success('Deleted');
-                        }
-                    }
-                });
-            }}
-          />
-      )
-  };
-
-  const gridColumns = [...mergedColumns, actionColumn];
-
   return (
     <Layout style={{ height: '100%' }}>
       {contextHolder}
       <Sider 
         theme="dark" 
         collapsible 
-
         collapsed={collapsed}
         onCollapse={(value) => setCollapsed(value)}
         width={250} 
@@ -543,7 +515,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
               <SqlEditor connectionId={connectionId} />
           ) : activeTable ? (
             <>
-              <div style={{ padding: '8px 16px', background: 'var(--card)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ padding: '8px 16px', background: 'var(--card)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Space>
                     <Button icon={<Plus size={16} />} onClick={handleAddRow}>Add Row</Button>
                     <Button icon={<RefreshCw size={16} />} onClick={handleRefresh}>Refresh</Button>
@@ -568,8 +540,27 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
                     <Button icon={<Edit size={16} />} onClick={() => setIsStructureModalVisible(true)}>Structure</Button>
                     {pendingFilter && <Button onClick={clearFilter}>Clear Filter</Button>}
                 </Space>
-                <div style={{ color: 'var(--muted-foreground)' }}>{filteredData.length} rows</div>
+                <Space>
+                    <Button 
+                        type={filterConditions.length > 0 ? "primary" : "default"}
+                        icon={<Filter size={16} />} 
+                        onClick={() => setIsFilterVisible(true)}
+                    >
+                        Filter {filterConditions.length > 0 && `(${filterConditions.length})`}
+                    </Button>
+                    <div style={{ color: 'var(--muted-foreground)' }}>{filteredData.length} rows</div>
+                </Space>
               </div>
+              <FilterModal
+                  visible={isFilterVisible}
+                  columns={structure}
+                  activeFilters={filterConditions}
+                  onCancel={() => setIsFilterVisible(false)}
+                  onApply={(newConditions) => {
+                      setFilterConditions(newConditions);
+                      setIsFilterVisible(false);
+                  }}
+              />
               <div style={{ flex: 1, overflow: 'auto' }}>
                 <Table
                   bordered
@@ -578,7 +569,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
                       onChange: onSelectChange,
                   }}
                   dataSource={paginatedData}
-                  columns={gridColumns}
+                  columns={mergedColumns}
                   components={{
                       header: { cell: ResizableTitle },
                       body: { cell: EditableCell }
@@ -672,14 +663,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
         visible={isBulkEditVisible}
         columns={structure}
         selectedCount={selectedRowKeys.length}
-        onCancel={() => setIsBulkEditVisible(false)}
-        onUpdate={handleBulkUpdate}
-      />
-      
-      <BulkEditModal 
-        visible={isBulkEditVisible}
-        columns={structure}
-        selectedCount={selectedRowKeys.length}
+        activeFilters={filterConditions}
         onCancel={() => setIsBulkEditVisible(false)}
         onUpdate={handleBulkUpdate}
       />

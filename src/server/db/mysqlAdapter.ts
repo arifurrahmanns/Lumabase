@@ -26,10 +26,26 @@ export class MysqlAdapter {
     return (rows as any[]).map(row => Object.values(row)[0] as string);
   }
 
-  async getTableData(tableName: string) {
+  async getTableData(tableName: string, conditions: any[] = []) {
     if (!this.connection) throw new Error('Database not connected');
-    // WARNING: Vulnerable to SQL injection if tableName is not validated.
-    const [rows] = await this.connection.query(`SELECT * FROM \`${tableName}\``);
+    let sql = `SELECT * FROM \`${tableName}\``;
+    const params: any[] = [];
+    
+    if (conditions && conditions.length > 0) {
+        const clauses = conditions.map(cond => {
+             const op = cond.operator.toUpperCase();
+             const allowedOps = ['=', '!=', '<', '>', '<=', '>=', 'LIKE'];
+             if (!allowedOps.includes(op)) throw new Error(`Invalid operator: ${op}`);
+             params.push(cond.value);
+             return `\`${cond.column}\` ${op} ?`;
+        });
+        sql += ' WHERE ' + clauses.join(' AND ');
+    }
+    
+    // Limit for safety? Maybe later.
+    sql += ' LIMIT 1000'; 
+
+    const [rows] = await this.connection.execute(sql, params);
     return rows as any[];
   }
 
@@ -76,6 +92,43 @@ export class MysqlAdapter {
       const sql = `UPDATE \`${tableName}\` SET \`${updateCol}\` = ? WHERE \`${pkCol}\` IN (${placeholders})`;
       // First arg is updateVal, followed by all pkVals
       const [result] = await this.connection.execute(sql, [updateVal, ...pkVals]);
+      return { success: true, changes: (result as any).affectedRows };
+  }
+
+  async updateRowsByFilter(tableName: string, updateCol: string, updateVal: any, conditions: { column: string, operator: string, value: any }[]) {
+      if (!this.connection) throw new Error('Database not connected');
+      if (conditions.length === 0) throw new Error('No conditions provided for bulk update. Use "Update All" carefully.');
+
+      let whereClause = '';
+      const params = [updateVal];
+
+      conditions.forEach((cond, index) => {
+          const op = cond.operator.toUpperCase();
+          const allowedOps = ['=', '!=', '<', '>', '<=', '>=', 'LIKE'];
+          if (!allowedOps.includes(op)) throw new Error(`Invalid operator: ${op}`);
+
+          const prefix = index === 0 ? 'WHERE' : 'AND';
+          whereClause += ` \`${cond.column}\` ${op} ?`;
+          // Prepend WHERE/AND manually or handle cleanly
+          if (index === 0) {
+             // Logic fix: The line above added the condition, but we need to join them.
+             // Actually, let's rewrite the loop logic to be cleaner.
+          }
+      });
+      
+      // Let's rely on map/join for better safety
+      const clauses = conditions.map(cond => {
+          const op = cond.operator.toUpperCase();
+          const allowedOps = ['=', '!=', '<', '>', '<=', '>=', 'LIKE'];
+          if (!allowedOps.includes(op)) throw new Error(`Invalid operator: ${op}`);
+          params.push(cond.value);
+          return `\`${cond.column}\` ${op} ?`;
+      });
+      
+      whereClause = 'WHERE ' + clauses.join(' AND ');
+
+      const sql = `UPDATE \`${tableName}\` SET \`${updateCol}\` = ? ${whereClause}`;
+      const [result] = await this.connection.execute(sql, params);
       return { success: true, changes: (result as any).affectedRows };
   }
 
