@@ -1,9 +1,24 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, MenuItemConstructorOptions } from 'electron'
 import path from 'node:path'
+import net from 'net'
 import { dbManager } from '../src/server/db'
 import { EngineController } from '../src/server/engineManager/engineController'
 import { EngineInstance } from '../src/server/engineManager/types'
 import { AppSettingsManager } from '../src/server/appSettings'
+
+// Helper to find next available port starting from a given port
+const findFreePort = (startPort: number): Promise<number> => {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.listen(startPort, () => {
+      server.close(() => resolve(startPort));
+    });
+    server.on('error', () => {
+      // Port in use, try next
+      resolve(findFreePort(startPort + 1));
+    });
+  });
+};
 
 process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public')
@@ -235,6 +250,10 @@ app.whenReady().then(() => {
       base: enginesPath,
       platform: process.platform
     };
+  });
+
+  ipcMain.handle('find-free-port', async (_, startPort: number) => {
+    return await findFreePort(startPort);
   });
 
   // Window Controls

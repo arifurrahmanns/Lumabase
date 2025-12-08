@@ -37,6 +37,7 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
   const [selectedType, setSelectedType] = useState<string>('mysql');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [submittable, setSubmittable] = useState(false);
   const [form] = Form.useForm();
 
   const loadInstances = async () => {
@@ -91,9 +92,41 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
       }
   };
 
-  const handleTypeChange = (type: string) => {
+  const handleTypeChange = async (type: string) => {
       setSelectedType(type);
-      // No need to update paths here anymore, done on submit
+      
+      // Suggest available port for this service type
+      const defaultPorts = { mysql: 3306, postgres: 5432 };
+      const startPort = defaultPorts[type as keyof typeof defaultPorts] || 3306;
+      
+      // Get all ports already used by instances (running or not)
+      const usedPorts = instances.map(instance => instance.port);
+      
+      try {
+        let suggestedPort = startPort;
+        
+        // Find a port that's both network-available AND not in use by any instance
+        while (true) {
+          const networkAvailablePort = await ipc.findFreePort(suggestedPort);
+          
+          // Check if this port is already assigned to an instance
+          if (!usedPorts.includes(networkAvailablePort)) {
+            // Port is free on network and not in instance list
+            form.setFieldsValue({ port: networkAvailablePort });
+            break;
+          }
+          
+          // This port is in use by an instance, try the next one
+          suggestedPort = networkAvailablePort + 1;
+        }
+        
+        // Trigger form validation to update submittable state
+        const values = form.getFieldsValue();
+        const isComplete = values.name && values.type && values.version && values.port;
+        setSubmittable(isComplete);
+      } catch (error) {
+        console.error('Failed to find free port:', error);
+      }
   };
 
   const handleVersionChange = (_version: string) => {
@@ -384,11 +417,21 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
               setIsModalVisible(false);
               setIsEditMode(false);
               setEditingId(null);
+              setSubmittable(false);
               form.resetFields();
           }}
           footer={null}
         >
-          <Form form={form} layout="vertical" onFinish={handleSave} initialValues={{ type: 'mysql', version: '8.0' }}>
+          <Form 
+            form={form} 
+            layout="vertical" 
+            onFinish={handleSave} 
+            initialValues={{ type: 'mysql', version: '8.0' }}
+            onValuesChange={(_, allValues) => {
+              const isComplete = allValues.name && allValues.type && allValues.version && allValues.port;
+              setSubmittable(isComplete);
+            }}
+          >
             <Form.Item name="name" label="Name" rules={[{ required: true }]}>
               <Input placeholder="My Local DB" disabled={isEditMode} />
             </Form.Item>
@@ -438,8 +481,14 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
             )}
 
             <Form.Item>
-              <Button type="primary" htmlType="submit" block loading={loading}>
-                {isEditMode ? "Save Changes" : "Create & Install"}
+              <Button 
+                type="primary" 
+                htmlType="submit" 
+                block 
+                loading={loading}
+                disabled={!submittable && !isEditMode}
+              >
+                {loading ? "Installing..." : isEditMode ? "Save Changes" : "Create & Install"}
               </Button>
             </Form.Item>
           </Form>

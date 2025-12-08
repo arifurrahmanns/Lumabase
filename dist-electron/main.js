@@ -4,6 +4,7 @@ var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { en
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 const electron = require("electron");
 const path$2 = require("node:path");
+const net = require("net");
 const mysql = require("mysql2/promise");
 const pg = require("pg");
 const events$1 = require("events");
@@ -12370,7 +12371,14 @@ var _eval = EvalError;
 var range = RangeError;
 var ref = ReferenceError;
 var syntax = SyntaxError;
-var type = TypeError;
+var type;
+var hasRequiredType;
+function requireType() {
+  if (hasRequiredType) return type;
+  hasRequiredType = 1;
+  type = TypeError;
+  return type;
+}
 var uri = URIError;
 var abs$1 = Math.abs;
 var floor$1 = Math.floor;
@@ -12616,7 +12624,7 @@ function requireCallBindApplyHelpers() {
   if (hasRequiredCallBindApplyHelpers) return callBindApplyHelpers;
   hasRequiredCallBindApplyHelpers = 1;
   var bind3 = functionBind;
-  var $TypeError2 = type;
+  var $TypeError2 = requireType();
   var $call2 = requireFunctionCall();
   var $actualApply = requireActualApply();
   callBindApplyHelpers = function callBindBasic(args) {
@@ -12689,7 +12697,7 @@ var $EvalError = _eval;
 var $RangeError = range;
 var $ReferenceError = ref;
 var $SyntaxError = syntax;
-var $TypeError$1 = type;
+var $TypeError$1 = requireType();
 var $URIError = uri;
 var abs = abs$1;
 var floor = floor$1;
@@ -13020,7 +13028,7 @@ var GetIntrinsic2 = getIntrinsic;
 var $defineProperty = GetIntrinsic2("%Object.defineProperty%", true);
 var hasToStringTag = requireShams()();
 var hasOwn$1 = hasown;
-var $TypeError = type;
+var $TypeError = requireType();
 var toStringTag = hasToStringTag ? Symbol.toStringTag : null;
 var esSetTostringtag = function setToStringTag(object, value) {
   var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
@@ -20678,6 +20686,17 @@ class AppSettingsManager {
     return newConfig;
   }
 }
+const findFreePort = (startPort) => {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.listen(startPort, () => {
+      server.close(() => resolve(startPort));
+    });
+    server.on("error", () => {
+      resolve(findFreePort(startPort + 1));
+    });
+  });
+};
 process.env.DIST = path$2.join(__dirname, "../dist");
 process.env.VITE_PUBLIC = electron.app.isPackaged ? process.env.DIST : path$2.join(process.env.DIST, "../public");
 let win;
@@ -20851,6 +20870,9 @@ electron.app.whenReady().then(() => {
       base: enginesPath,
       platform: process.platform
     };
+  });
+  electron.ipcMain.handle("find-free-port", async (_, startPort) => {
+    return await findFreePort(startPort);
   });
   electron.ipcMain.handle("window-minimize", () => {
     win == null ? void 0 : win.minimize();

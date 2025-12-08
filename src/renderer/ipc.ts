@@ -31,6 +31,7 @@ export const ipc = {
   updateEngine: (id: string, updates: any) => window.electron.ipcRenderer.invoke('engine-update', { id, updates }),
   getDefaultEnginePaths: () => window.electron.ipcRenderer.invoke('get-default-engine-paths'),
   onDownloadProgress: (callback: (percent: number) => void) => window.electron.ipcRenderer.on('engine-download-progress', (_, percent) => callback(percent)),
+  findFreePort: (startPort: number) => window.electron.ipcRenderer.invoke('find-free-port', startPort),
   
   // Window Controls
   minimizeWindow: () => window.electron.ipcRenderer.invoke('window-minimize'),
