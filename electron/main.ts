@@ -12,6 +12,8 @@ const engineController = new EngineController()
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 let tray: Tray | null = null;
+let showInTray = true;
+let isQuitting = false;
 
 function createWindow() {
   win = new BrowserWindow({
@@ -59,25 +61,50 @@ function createWindow() {
       }
     });
   }
+
+  win.on('close', (event) => {
+    if (!isQuitting && showInTray) {
+      event.preventDefault();
+      win?.hide();
+      return false;
+    }
+    return true;
+  });
 }
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
-  console.log('Window all closed, setting quitting flag...');
-  engineController.setQuitting();
   if (process.platform !== 'darwin') {
     app.quit()
     win = null
   }
 })
 
-app.on('before-quit', async (_event) => {
-    console.log('App closing, setting quitting flag...');
-    // Do NOT stop instances if we want them to persist.
-    // Just mark as quitting so we don't overwrite the config with 'stopped'
-    engineController.setQuitting();
+app.on('before-quit', async (event) => {
+    const instances = engineController.getInstances();
+    const hasRunning = instances.some(i => i.status === 'running' || i.status === 'starting');
+    
+    if (hasRunning) {
+        // Stop all instances before quitting
+        console.log('App quitting with running instances, stopping them...');
+        event.preventDefault();
+        
+        // Mark as quitting so we can close windows if needed
+        isQuitting = true;
+        
+        try {
+            await engineController.stopAllInstances();
+        } catch (error) {
+            console.error('Failed to stop all instances:', error);
+        }
+        
+        // Resume quit
+        app.quit();
+    } else {
+        isQuitting = true;
+    }
 });
 
 app.on('activate', () => {
@@ -233,7 +260,8 @@ app.whenReady().then(() => {
   // Tray Management
   const iconPath = path.join(process.env.VITE_PUBLIC || '', 'app-icon.png');
   const icon = nativeImage.createFromPath(iconPath);
-  let showInTray = true;
+
+  // showInTray moved to top level
 
   const updateTrayMenu = (instances: EngineInstance[]) => {
       if (!tray) return;
@@ -277,7 +305,6 @@ app.whenReady().then(() => {
           {
               label: 'Quit',
               click: () => {
-                  engineController.setQuitting();
                   app.quit();
               }
           }
