@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Table, Button, Form, Input, Select, Checkbox, message, Space, Popconfirm, Tooltip } from 'antd';
+import { Modal, Table, Button, Form, Input, Checkbox, message, Space, Popconfirm, Tooltip, AutoComplete } from 'antd';
 import { Trash2, Plus, Edit, Save, X, Link } from 'lucide-react';
 import { ipc } from '../renderer/ipc';
 import ForeignKeyModal from './ForeignKeyModal';
@@ -12,6 +12,16 @@ interface Props {
   onSuccess: () => void;
 }
 
+const MYSQL_TYPES = [
+  'BIGINT', 'BINARY', 'BIT', 'BLOB', 'BOOLEAN', 'CHAR', 'DATE', 'DATETIME',
+  'DECIMAL', 'DOUBLE', 'ENUM', 'FLOAT', 'GEOMETRY', 'GEOMETRYCOLLECTION',
+  'INT', 'JSON', 'LINESTRING', 'LONGBLOB', 'LONGTEXT', 'MEDIUMBLOB',
+  'MEDIUMINT', 'MEDIUMTEXT', 'MULTILINESTRING', 'MULTIPOINT', 'MULTIPOLYGON',
+  'POINT', 'POLYGON', 'SMALLINT', 'TEXT', 'TIME', 'TIMESTAMP',
+  'TINYBLOB', 'TINYINT', 'TINYTEXT', 'UNSIGNED', 'VARBINARY',
+  'VARCHAR(255)', 'YEAR'
+];
+
 const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, connectionId, onSuccess }) => {
   const [columns, setColumns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -19,6 +29,8 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
   const [editingKey, setEditingKey] = useState('');
   const [fkModalVisible, setFkModalVisible] = useState(false);
   const [selectedColumnForFk, setSelectedColumnForFk] = useState('');
+  
+  const typeOptions = MYSQL_TYPES.map(t => ({ value: t }));
 
   useEffect(() => {
     if (visible) {
@@ -137,20 +149,14 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
         if (isEditing(record)) {
             return (
                 <Form.Item name="type" style={{ margin: 0 }} rules={[{ required: true }]}>
-                    <Select style={{ width: 100 }}>
-                        <Select.Option value="VARCHAR(255)">VARCHAR</Select.Option>
-                        <Select.Option value="INT">INT</Select.Option>
-                        <Select.Option value="TEXT">TEXT</Select.Option>
-                        <Select.Option value="FLOAT">FLOAT</Select.Option>
-                        <Select.Option value="BOOLEAN">BOOLEAN</Select.Option>
-                        <Select.Option value="VARCHAR(255)">VARCHAR</Select.Option>
-                        <Select.Option value="INT">INT</Select.Option>
-                        <Select.Option value="BIGINT">BIGINT</Select.Option>
-                        <Select.Option value="TEXT">TEXT</Select.Option>
-                        <Select.Option value="FLOAT">FLOAT</Select.Option>
-                        <Select.Option value="BOOLEAN">BOOLEAN</Select.Option>
-                        <Select.Option value="DATE">DATE</Select.Option>
-                    </Select>
+                    <AutoComplete
+                        style={{ width: 160 }}
+                        placeholder="Type"
+                        options={typeOptions}
+                        filterOption={(inputValue, option) =>
+                            option!.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                        }
+                    />
                 </Form.Item>
             );
         }
@@ -274,19 +280,14 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
             <Input placeholder="Column Name" />
           </Form.Item>
           <Form.Item name="type" rules={[{ required: true }]}>
-            <Select style={{ width: 120 }} placeholder="Type">
-              <Select.Option value="VARCHAR(255)">VARCHAR</Select.Option>
-              <Select.Option value="INT">INT</Select.Option>
-              <Select.Option value="TEXT">TEXT</Select.Option>
-              <Select.Option value="FLOAT">FLOAT</Select.Option>
-              <Select.Option value="BOOLEAN">BOOLEAN</Select.Option>
-              <Select.Option value="VARCHAR(255)">VARCHAR</Select.Option>
-              <Select.Option value="INT">INT</Select.Option>
-              <Select.Option value="BIGINT">BIGINT</Select.Option>
-              <Select.Option value="TEXT">TEXT</Select.Option>
-              <Select.Option value="FLOAT">FLOAT</Select.Option>
-              <Select.Option value="BOOLEAN">BOOLEAN</Select.Option>
-            </Select>
+             <AutoComplete
+                style={{ width: 160 }}
+                placeholder="Type"
+                options={typeOptions}
+                filterOption={(inputValue, option) =>
+                    option!.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                }
+            />
           </Form.Item>
           <Form.Item name="unsigned" valuePropName="checked">
             <Checkbox>Unsigned</Checkbox>
@@ -297,7 +298,7 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
           <Form.Item name="default">
             <Input placeholder="Default Value" />
           </Form.Item>
-          <Form.Item>
+          <Form.Item style={{ marginTop: 29 }}>
             <Button type="primary" htmlType="submit" icon={<Plus size={16} />}>Add</Button>
           </Form.Item>
         </Form>

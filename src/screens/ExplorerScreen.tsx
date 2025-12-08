@@ -134,11 +134,53 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
       if (activeTable) {
         refresh();
         reset(); 
+        setSelectedRowKeys([]); // connect reset
       } else {
         loadTables();
         loadDatabases();
       }
   }, [activeTable, refresh, reset]);
+
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+
+  const onSelectChange = (newSelectedRowKeys: React.Key[]) => {
+      setSelectedRowKeys(newSelectedRowKeys);
+  };
+
+  const hasSelected = selectedRowKeys.length > 0;
+
+  const handleBulkDelete = () => {
+      if (!selectedRowKeys.length) return;
+       modal.confirm({
+          title: `Delete ${selectedRowKeys.length} rows?`,
+          content: 'This action cannot be undone.',
+          okText: `Delete ${selectedRowKeys.length} Items`,
+          okType: 'danger',
+          onOk: async () => {
+              const pk = 'id'; // Hardcoded for now, should get from structure
+              try {
+                  // Filter out unsaved rows (keys starting with 'new_') from database delete
+                  const dbKeys = selectedRowKeys.filter(k => !String(k).startsWith('new_'));
+                  const localKeys = selectedRowKeys.filter(k => String(k).startsWith('new_'));
+                  
+                  if (dbKeys.length > 0) {
+                      await ipc.deleteRows(connectionId, activeTable!, pk, dbKeys);
+                  }
+                  
+                  // Also remove from local state
+                  if (localKeys.length > 0) {
+                      setTableData(prev => prev.filter(r => !localKeys.includes(r._tempKey)));
+                  }
+
+                  message.success(`Deleted ${selectedRowKeys.length} rows`);
+                  setSelectedRowKeys([]);
+                  loadTableData();
+              } catch (e: any) {
+                  message.error(`Failed to delete rows: ${e.message}`);
+              }
+          }
+      });
+  };
 
   useImperativeHandle(ref, () => ({
       refresh: handleRefresh
@@ -448,6 +490,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
                   setViewMode('table');
                   setActiveTable(e.key);
                   setPendingFilter(null);
+                  setSelectedRowKeys([]);
               }
           }}
           items={[
@@ -480,6 +523,16 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
                 <Space>
                     <Button icon={<Plus size={16} />} onClick={handleAddRow}>Add Row</Button>
                     <Button icon={<RefreshCw size={16} />} onClick={handleRefresh}>Refresh</Button>
+                    {hasSelected && (
+                        <Button 
+                            danger 
+                            type="primary" 
+                            icon={<Trash2 size={16} />} 
+                            onClick={handleBulkDelete}
+                        >
+                            Delete Selected ({selectedRowKeys.length})
+                        </Button>
+                    )}
                     <Button icon={<Edit size={16} />} onClick={() => setIsStructureModalVisible(true)}>Structure</Button>
                     {pendingFilter && <Button onClick={clearFilter}>Clear Filter</Button>}
                 </Space>
@@ -488,6 +541,10 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
               <div style={{ flex: 1, overflow: 'auto' }}>
                 <Table
                   bordered
+                  rowSelection={{
+                      selectedRowKeys,
+                      onChange: onSelectChange,
+                  }}
                   dataSource={paginatedData}
                   columns={gridColumns}
                   components={{

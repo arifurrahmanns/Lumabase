@@ -6,6 +6,7 @@ export const ipc = {
   addRow: (connectionId: string, tableName: string, row: any) => window.electron.ipcRenderer.invoke('add-row', { connectionId, tableName, row }),
   updateRow: (connectionId: string, tableName: string, row: any, primaryKeyColumn: string, primaryKeyValue: any) => window.electron.ipcRenderer.invoke('update-row', { connectionId, tableName, row, primaryKeyColumn, primaryKeyValue }),
   deleteRow: (connectionId: string, tableName: string, primaryKeyColumn: string, primaryKeyValue: any) => window.electron.ipcRenderer.invoke('delete-row', { connectionId, tableName, primaryKeyColumn, primaryKeyValue }),
+  deleteRows: (connectionId: string, tableName: string, primaryKeyColumn: string, primaryKeyValues: any[]) => window.electron.ipcRenderer.invoke('delete-rows', { connectionId, tableName, primaryKeyColumn, primaryKeyValues }),
   createTable: (connectionId: string, tableName: string, columns: any[]) => window.electron.ipcRenderer.invoke('create-table', { connectionId, tableName, columns }),
   dropTable: (connectionId: string, tableName: string) => window.electron.ipcRenderer.invoke('drop-table', { connectionId, tableName }),
   getTableStructure: (connectionId: string, tableName: string) => window.electron.ipcRenderer.invoke('get-table-structure', { connectionId, tableName }),

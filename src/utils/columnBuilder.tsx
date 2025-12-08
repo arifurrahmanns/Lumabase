@@ -1,5 +1,6 @@
 import { ipc } from '../renderer/ipc';
 import { message } from 'antd';
+import dayjs from 'dayjs';
 
 export const buildColumns = async (
     structure: any[],
@@ -20,6 +21,15 @@ export const buildColumns = async (
 
         let selectOptions: any[] = [];
         let inputType = 'text';
+
+        const typeLower = (col.type || '').toLowerCase();
+        if (typeLower.includes('date') || typeLower.includes('year')) {
+            inputType = 'date';
+            baseCol.render = (text: any) => text ? dayjs(text).format('YYYY-MM-DD') : null;
+        } else if (typeLower.includes('time')) {
+             inputType = 'datetime';
+             baseCol.render = (text: any) => text ? dayjs(text).format('YYYY-MM-DD') : null;
+        }
 
         if (col.fk) {
             inputType = 'select';

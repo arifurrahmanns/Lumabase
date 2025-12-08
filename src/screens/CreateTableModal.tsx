@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Form, Input, Select, Checkbox, Button, message, Table } from 'antd';
+import { Modal, Form, Input, AutoComplete, Checkbox, Button, message, Table } from 'antd';
 import { Plus, Trash2 } from 'lucide-react';
 import { ipc } from '../renderer/ipc';
 
@@ -9,6 +9,16 @@ interface Props {
   connectionId: string;
   onSuccess: () => void;
 }
+
+const MYSQL_TYPES = [
+  'BIGINT', 'BINARY', 'BIT', 'BLOB', 'BOOLEAN', 'CHAR', 'DATE', 'DATETIME',
+  'DECIMAL', 'DOUBLE', 'ENUM', 'FLOAT', 'GEOMETRY', 'GEOMETRYCOLLECTION',
+  'INT', 'JSON', 'LINESTRING', 'LONGBLOB', 'LONGTEXT', 'MEDIUMBLOB',
+  'MEDIUMINT', 'MEDIUMTEXT', 'MULTILINESTRING', 'MULTIPOINT', 'MULTIPOLYGON',
+  'POINT', 'POLYGON', 'SMALLINT', 'TEXT', 'TIME', 'TIMESTAMP',
+  'TINYBLOB', 'TINYINT', 'TINYTEXT', 'UNSIGNED', 'VARBINARY',
+  'VARCHAR(255)', 'YEAR'
+];
 
 interface ColumnDef {
   key: string;
@@ -24,6 +34,8 @@ const CreateTableModal: React.FC<Props> = ({ visible, onCancel, connectionId, on
   const [form] = Form.useForm();
   const [columns, setColumns] = useState<ColumnDef[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  const typeOptions = MYSQL_TYPES.map(t => ({ value: t }));
 
   const handleAddColumn = (values: any) => {
     const newCol: ColumnDef = {
@@ -110,16 +122,13 @@ const CreateTableModal: React.FC<Props> = ({ visible, onCancel, connectionId, on
                     <Input placeholder="Column Name" />
                 </Form.Item>
                 <Form.Item name="colType" label="Type" style={{ marginBottom: 0, flex: 1.5 }}>
-                    <Select placeholder="Type">
-                        <Select.Option value="INT">INT</Select.Option>
-                        <Select.Option value="VARCHAR(255)">VARCHAR(255)</Select.Option>
-                        <Select.Option value="TEXT">TEXT</Select.Option>
-                        <Select.Option value="BOOLEAN">BOOLEAN</Select.Option>
-                        <Select.Option value="DATE">DATE</Select.Option>
-                        <Select.Option value="DATETIME">DATETIME</Select.Option>
-                        <Select.Option value="FLOAT">FLOAT</Select.Option>
-                        <Select.Option value="BIGINT">BIGINT</Select.Option>
-                    </Select>
+                    <AutoComplete
+                        placeholder="Type"
+                        options={typeOptions}
+                        filterOption={(inputValue, option) =>
+                            option!.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                        }
+                    />
                 </Form.Item>
                 <Form.Item name="colDefault" label="Default" style={{ marginBottom: 0, flex: 1.5 }}>
                     <Input placeholder="NULL" />
