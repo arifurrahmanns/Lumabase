@@ -48,21 +48,16 @@ function createWindow() {
   // Disable DevTools in production
   if (app.isPackaged) {
     win.removeMenu();
-    win.webContents.on('before-input-event', (event, input) => {
-      // Windows/Linux: Ctrl+Shift+I, Ctrl+Shift+J
-      if (input.control && input.shift && (input.key.toLowerCase() === 'i' || input.key.toLowerCase() === 'j')) {
-        event.preventDefault();
-      }
-      // macOS: Cmd+Option+I, Cmd+Option+J
-      if (input.meta && input.alt && (input.key.toLowerCase() === 'i' || input.key.toLowerCase() === 'j')) {
-          event.preventDefault();
-      }
-      // F12
-      if (input.key === 'F12') {
-        event.preventDefault();
-      }
-    });
   }
+
+  // Handle global shortcuts to prevent unwanted behavior (reload)
+  win.webContents.on('before-input-event', (event, input) => {
+    // Prevent Ctrl+R / Cmd+R (Reload)
+    if ((input.control || input.meta) && input.key.toLowerCase() === 'r') {
+      event.preventDefault();
+    }
+  });
+
 
   win.on('close', (event) => {
     if (!isQuitting && showInTray) {
