@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Table, Button, Form, Input, message, Popconfirm, Space } from 'antd';
-import { UserAddOutlined, DeleteOutlined, EditOutlined, ReloadOutlined } from '@ant-design/icons';
+import { UserPlus, Trash2, Edit, RefreshCw } from 'lucide-react';
 import { ipc } from '../renderer/ipc';
 
 interface Props {
@@ -83,7 +83,7 @@ const UserManagementModal: React.FC<Props> = ({ visible, onCancel, connectionId 
       render: (_: any, record: any) => (
         <Space>
             <Button 
-                icon={<EditOutlined />} 
+                icon={<Edit size={16} />} 
                 size="small" 
                 onClick={() => {
                     setEditingUser(record);
@@ -92,7 +92,7 @@ const UserManagementModal: React.FC<Props> = ({ visible, onCancel, connectionId 
                 }}
             />
             <Popconfirm title="Delete user?" onConfirm={() => handleDeleteUser(record)}>
-                <Button icon={<DeleteOutlined />} danger size="small" />
+                <Button icon={<Trash2 size={16} />} danger size="small" />
             </Popconfirm>
         </Space>
       ),
@@ -108,8 +108,8 @@ const UserManagementModal: React.FC<Props> = ({ visible, onCancel, connectionId 
       width={700}
     >
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <Button icon={<ReloadOutlined />} onClick={loadUsers}>Refresh</Button>
-        <Button type="primary" icon={<UserAddOutlined />} onClick={() => setIsAddModalVisible(true)}>
+        <Button icon={<RefreshCw size={16} />} onClick={loadUsers}>Refresh</Button>
+        <Button type="primary" icon={<UserPlus size={16} />} onClick={() => setIsAddModalVisible(true)}>
           Add User
         </Button>
       </div>

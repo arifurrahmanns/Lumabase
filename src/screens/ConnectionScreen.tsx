@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, Select, message, Typography, InputNumber, Divider } from 'antd';
-import { DatabaseOutlined } from '@ant-design/icons';
+import { Database } from 'lucide-react';
 import { ipc } from '../renderer/ipc';
 import { useNavigate } from 'react-router-dom';
 
@@ -75,7 +75,7 @@ const ConnectionScreen: React.FC<ConnectionScreenProps> = ({ onConnect }) => {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#000' }}>
       <Card style={{ width: 450, textAlign: 'center' }}>
-        <Title level={3}><DatabaseOutlined /> Connect to Database</Title>
+        <Title level={3}><Database size={24} style={{ marginRight: 8, verticalAlign: 'middle' }} /> Connect to Database</Title>
         
         {localInstances.length > 0 && (
           <>

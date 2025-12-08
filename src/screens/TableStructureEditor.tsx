@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Table, Button, Form, Input, Select, Checkbox, message, Space, Popconfirm, Tooltip } from 'antd';
-import { DeleteOutlined, PlusOutlined, EditOutlined, SaveOutlined, CloseOutlined, LinkOutlined } from '@ant-design/icons';
+import { Trash2, Plus, Edit, Save, X, Link } from 'lucide-react';
 import { ipc } from '../renderer/ipc';
 import ForeignKeyModal from './ForeignKeyModal';
 
@@ -212,7 +212,7 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
                 {val ? `${val.table}(${val.column})` : 'EMPTY'}
                 <Button 
                     type="text" 
-                    icon={<LinkOutlined />} 
+                    icon={<Link size={16} />} 
                     size="small" 
                     onClick={() => {
                         setSelectedColumnForFk(record.name);
@@ -231,16 +231,16 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
         const editable = isEditing(record);
         return editable ? (
             <Space>
-                <Button icon={<SaveOutlined />} type="link" onClick={() => save(record.name)} />
-                <Button icon={<CloseOutlined />} type="link" onClick={cancel} />
+                <Button icon={<Save size={16} />} type="link" onClick={() => save(record.name)} />
+                <Button icon={<X size={16} />} type="link" onClick={cancel} />
             </Space>
         ) : (
             <Space>
                 <Tooltip title="Edit Column">
-                    <Button disabled={editingKey !== ''} icon={<EditOutlined />} type="link" onClick={() => edit(record)} />
+                    <Button disabled={editingKey !== ''} icon={<Edit size={16} />} type="link" onClick={() => edit(record)} />
                 </Tooltip>
                 <Popconfirm title="Sure to delete?" onConfirm={() => handleDeleteColumn(record.name)}>
-                    <Button disabled={editingKey !== ''} icon={<DeleteOutlined />} type="link" danger />
+                    <Button disabled={editingKey !== ''} icon={<Trash2 size={16} />} type="link" danger />
                 </Popconfirm>
             </Space>
         );
@@ -298,7 +298,7 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
             <Input placeholder="Default Value" />
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit" icon={<PlusOutlined />}>Add</Button>
+            <Button type="primary" htmlType="submit" icon={<Plus size={16} />}>Add</Button>
           </Form.Item>
         </Form>
       </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { Layout, Table, Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Progress, Tooltip, Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
-import { PlusOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined, ReloadOutlined, ExportOutlined, EditOutlined, SettingOutlined } from '@ant-design/icons';
+import { Plus, PlayCircle, PauseCircle, Trash2, RefreshCw, LogOut, Edit as EditIcon, Settings } from 'lucide-react';
 import { ipc } from '../renderer/ipc';
 
 const { Content } = Layout;
@@ -282,20 +282,20 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
       title: 'Actions',
       key: 'actions',
       width: 70,
-      align: 'center' as const,
+      align: 'right' as const,
       render: (_: any, record: EngineInstance) => {
         const items: MenuProps['items'] = [
             {
                 key: 'edit',
                 label: 'Edit Configuration',
-                icon: <EditOutlined />,
+                icon: <EditIcon size={16} />,
                 disabled: record.status !== 'stopped',
                 onClick: () => handleEdit(record)
             },
             {
                 key: 'remove',
                 label: 'Remove Instance',
-                icon: <DeleteOutlined />,
+                icon: <Trash2 size={16} />,
                 danger: true,
                 disabled: record.status === 'running',
                 onClick: () => handleRemove(record.id)
@@ -307,7 +307,7 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
               {record.status === 'running' && (
                 <Tooltip title="Open">
                     <Button 
-                      icon={<ExportOutlined />} 
+                      icon={<LogOut size={16} />} 
                       type="primary"
                       size="small"
                       style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
@@ -319,7 +319,7 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
               {record.status === 'running' ? (
                 <Tooltip title="Stop">
                     <Button 
-                      icon={<PauseCircleOutlined />} 
+                      icon={<PauseCircle size={16} />} 
                       type="primary"
                       danger 
                       size="small"
@@ -329,7 +329,7 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
               ) : (
                 <Tooltip title="Start">
                     <Button 
-                      icon={<PlayCircleOutlined />} 
+                      icon={<PlayCircle size={16} />} 
                       type="primary" 
                       size="small"
                       onClick={() => handleStart(record.id)}
@@ -340,7 +340,7 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
 
               <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']}>
                   <Button 
-                    icon={<SettingOutlined />} 
+                    icon={<Settings size={16} />} 
                     size="small"
                   />
               </Dropdown>
@@ -357,8 +357,8 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
           <h1>DB Engine Manager</h1>
           <Space>
-            <Button icon={<ReloadOutlined />} onClick={loadInstances}>Refresh</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+            <Button icon={<RefreshCw size={16} />} onClick={loadInstances}>Refresh</Button>
+            <Button type="primary" icon={<Plus size={16} />} onClick={() => {
                 setIsEditMode(false);
                 setEditingId(null);
                 form.resetFields();

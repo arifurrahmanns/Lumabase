@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input, Select, Checkbox, Button, message, Table } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Plus, Trash2 } from 'lucide-react';
 import { ipc } from '../renderer/ipc';
 
 interface Props {
@@ -77,7 +77,7 @@ const CreateTableModal: React.FC<Props> = ({ visible, onCancel, connectionId, on
         <Button 
             type="text" 
             danger 
-            icon={<DeleteOutlined />} 
+            icon={<Trash2 size={16} />} 
             onClick={() => handleDeleteColumn(record.key)} 
         />
       ),
@@ -135,7 +135,7 @@ const CreateTableModal: React.FC<Props> = ({ visible, onCancel, connectionId, on
                 </Form.Item>
                 <Button 
                     type="dashed" 
-                    icon={<PlusOutlined />} 
+                    icon={<Plus size={16} />} 
                     onClick={() => {
                         const values = form.getFieldsValue(['colName', 'colType', 'colNullable', 'colPK', 'colAI', 'colDefault']);
                         if (!values.colName || !values.colType) {

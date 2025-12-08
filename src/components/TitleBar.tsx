@@ -1,13 +1,13 @@
 import React from 'react';
 import { Space, Button, Checkbox } from 'antd';
 import { 
-    QuestionCircleOutlined, 
-    ReloadOutlined, 
-    PlusOutlined, 
-    MinusOutlined, 
-    BorderOutlined, 
-    CloseOutlined
-} from '@ant-design/icons';
+    HelpCircle, 
+    RefreshCw, 
+    Plus, 
+    Minus, 
+    Square, 
+    X
+} from 'lucide-react';
 import { ipc } from '../renderer/ipc';
 
 interface TitleBarProps {
@@ -49,16 +49,16 @@ const TitleBar: React.FC<TitleBarProps> = ({ onAddTab, onRefresh, refreshDisable
         } as React.CSSProperties}>
             {/* Left Actions */}
             <Space style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-                <Button type="text" size="small" icon={<QuestionCircleOutlined />} style={{ color: '#aaa' }} />
+                <Button type="text" size="small" icon={<HelpCircle size={16} />} style={{ color: '#aaa' }} />
                 <Button 
                     type="text" 
                     size="small" 
-                    icon={<ReloadOutlined />} 
+                    icon={<RefreshCw size={16} />} 
                     style={{ color: '#aaa' }} 
                     onClick={onRefresh}
                     disabled={refreshDisabled}
                 />
-                <Button type="text" size="small" icon={<PlusOutlined />} style={{ color: '#aaa' }} onClick={onAddTab} />
+                <Button type="text" size="small" icon={<Plus size={16} />} style={{ color: '#aaa' }} onClick={onAddTab} />
             </Space>
 
             {/* Config & Window Controls */}
@@ -88,21 +88,21 @@ const TitleBar: React.FC<TitleBarProps> = ({ onAddTab, onRefresh, refreshDisable
                     <Button 
                         type="text" 
                         size="small" 
-                        icon={<MinusOutlined />} 
+                        icon={<Minus size={16} />} 
                         style={{ color: '#aaa', width: 40, height: 32, borderRadius: 0 }} 
                         onClick={() => ipc.minimizeWindow()}
                     />
                     <Button 
                         type="text" 
                         size="small" 
-                        icon={<BorderOutlined style={{ fontSize: 10 }} />} 
+                        icon={<Square size={10} />} 
                         style={{ color: '#aaa', width: 40, height: 32, borderRadius: 0 }} 
                         onClick={() => ipc.maximizeWindow()}
                     />
                     <Button 
                         type="text" 
                         size="small" 
-                        icon={<CloseOutlined />} 
+                        icon={<X size={16} />} 
                         style={{ color: '#aaa', width: 40, height: 32, borderRadius: 0 }} 
                         className="hover:bg-red-500 hover:text-white"
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'red'}

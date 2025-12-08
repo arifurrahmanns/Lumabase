@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Layout, Button, Table, message, Space } from 'antd';
-import { PlayCircleOutlined } from '@ant-design/icons';
+import { PlayCircle } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
@@ -82,7 +82,7 @@ const SqlEditor: React.FC<SqlEditorProps> = ({ connectionId, initialQuery = '' }
             <Space>
                 <Button 
                     type="primary" 
-                    icon={<PlayCircleOutlined />} 
+                    icon={<PlayCircle size={16} />} 
                     onClick={handleExecute} 
                     loading={loading}
                 >

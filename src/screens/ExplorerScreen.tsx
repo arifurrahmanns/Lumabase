@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Layout, Menu, Button, Space, Empty, message, Select, Modal, Form, Input, Table, Dropdown, Pagination } from 'antd';
-import { PlusOutlined, ReloadOutlined, EditOutlined, TableOutlined, CodeOutlined, DeleteOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { Plus, RefreshCw, Edit, Table as TableIcon, Code, Trash2, Database } from 'lucide-react';
 import { ipc } from '../renderer/ipc';
 import TableStructureEditor from './TableStructureEditor';
 import CreateTableModal from './CreateTableModal';
@@ -300,7 +300,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
           <Button 
             type="text" 
             danger 
-            icon={<DeleteOutlined />} 
+            icon={<Trash2 size={16} />} 
             onClick={(e) => {
                 e.stopPropagation();
                 // If it's a new unsaved row, just remove from state
@@ -365,19 +365,19 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
                                 { type: 'divider' },
                                 {
                                     key: 'refresh-dbs',
-                                    icon: <ReloadOutlined />,
+                                    icon: <RefreshCw size={16} />,
                                     label: 'Refresh List',
                                     onClick: () => loadDatabases()
                                 },
                                 {
                                     key: 'new-db',
-                                    icon: <PlusOutlined />,
+                                    icon: <Plus size={16} />,
                                     label: 'New Database',
                                     onClick: () => setIsCreateDbModalVisible(true)
                                 },
                                 {
                                     key: 'manage-users',
-                                    icon: <EditOutlined />,
+                                    icon: <Edit size={16} />,
                                     label: 'Manage Users',
                                     onClick: () => setIsUserModalVisible(true)
                                 }
@@ -385,7 +385,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
                         }} 
                         trigger={['click']}
                     >
-                         <Button type="text" icon={<DatabaseOutlined />} title={currentDb || "Select Database"} />
+                         <Button type="text" icon={<Database size={16} />} title={currentDb || "Select Database"} />
                     </Dropdown>
                 </div>
             ) : (
@@ -397,10 +397,10 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
                     dropdownRender={menu => (
                         <>
                             {menu}
-                            <Button type="text" block icon={<PlusOutlined />} onClick={() => setIsCreateDbModalVisible(true)}>
+                            <Button type="text" block icon={<Plus size={16} />} onClick={() => setIsCreateDbModalVisible(true)}>
                                 New Database
                             </Button>
-                            <Button type="text" block icon={<EditOutlined />} onClick={() => setIsUserModalVisible(true)}>
+                            <Button type="text" block icon={<Edit size={16} />} onClick={() => setIsUserModalVisible(true)}>
                                 Manage Users
                             </Button>
                         </>
@@ -420,7 +420,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
                                     <Button 
                                         type="text" 
                                         size="small" 
-                                        icon={<DeleteOutlined />} 
+                                        icon={<Trash2 size={16} />} 
                                         danger
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -451,9 +451,9 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
               }
           }}
           items={[
-              { key: 'sql-editor', icon: <CodeOutlined />, label: 'SQL Editor', style: { marginBottom: 8 } },
+              { key: 'sql-editor', icon: <Code size={16} />, label: 'SQL Editor', style: { marginBottom: 8 } },
               { type: 'divider' },
-              ...tables.map(t => ({ key: t, icon: <TableOutlined />, label: t }))
+              ...tables.map(t => ({ key: t, icon: <TableIcon size={16} />, label: t }))
           ]}
         />
           </div>
@@ -461,7 +461,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
               <Button 
                 type="dashed" 
                 block={!collapsed} 
-                icon={<PlusOutlined />} 
+                icon={<Plus size={16} />} 
                 onClick={() => setIsCreateTableModalVisible(true)}
                 title={collapsed ? "New Table" : undefined}
               >
@@ -478,9 +478,9 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>(({ con
             <>
               <div style={{ padding: '8px 16px', background: 'var(--card)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
                 <Space>
-                    <Button icon={<PlusOutlined />} onClick={handleAddRow}>Add Row</Button>
-                    <Button icon={<ReloadOutlined />} onClick={handleRefresh}>Refresh</Button>
-                    <Button icon={<EditOutlined />} onClick={() => setIsStructureModalVisible(true)}>Structure</Button>
+                    <Button icon={<Plus size={16} />} onClick={handleAddRow}>Add Row</Button>
+                    <Button icon={<RefreshCw size={16} />} onClick={handleRefresh}>Refresh</Button>
+                    <Button icon={<Edit size={16} />} onClick={() => setIsStructureModalVisible(true)}>Structure</Button>
                     {pendingFilter && <Button onClick={clearFilter}>Clear Filter</Button>}
                 </Space>
                 <div style={{ color: 'var(--muted-foreground)' }}>{filteredData.length} rows</div>

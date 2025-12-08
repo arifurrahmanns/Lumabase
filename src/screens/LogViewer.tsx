@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, List, Typography, Button } from 'antd';
-import { CloseCircleOutlined, CheckCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { XCircle, CheckCircle, Info } from 'lucide-react';
 
 const { Text } = Typography;
 
@@ -35,9 +35,9 @@ const LogViewer: React.FC<Props> = ({ visible, onClose, logs, onClear }) => {
           <List.Item>
             <List.Item.Meta
               avatar={
-                item.type === 'error' ? <CloseCircleOutlined style={{ color: 'red' }} /> :
-                item.type === 'success' ? <CheckCircleOutlined style={{ color: 'green' }} /> :
-                <InfoCircleOutlined style={{ color: 'blue' }} />
+                item.type === 'error' ? <XCircle style={{ color: 'red' }} size={24} /> :
+                item.type === 'success' ? <CheckCircle style={{ color: 'green' }} size={24} /> :
+                <Info style={{ color: 'blue' }} size={24} />
               }
               title={<Text type={item.type === 'error' ? 'danger' : item.type === 'success' ? 'success' : undefined}>{item.message}</Text>}
               description={item.timestamp}

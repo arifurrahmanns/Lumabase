@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Switch, Button, List, Typography, Space, Divider, Badge } from 'antd';
-import { PoweroffOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { Power, LayoutGrid } from 'lucide-react';
 import { ipc } from '../renderer/ipc';
 import { EngineInstance } from '../server/engineManager/types';
 
@@ -130,10 +130,10 @@ const TrayWindow: React.FC = () => {
       <Divider style={{ margin: '12px 0', borderColor: '#303030' }} />
 
       <Space direction="vertical" style={{ width: '100%' }} size="small">
-        <Button block icon={<AppstoreOutlined />} onClick={handleOpenApp} style={{ textAlign: 'left' }}>
+        <Button block icon={<LayoutGrid size={16} />} onClick={handleOpenApp} style={{ textAlign: 'left' }}>
           Open Dashboard
         </Button>
-        <Button block danger type="text" icon={<PoweroffOutlined />} onClick={handleQuit} style={{ textAlign: 'left' }}>
+        <Button block danger type="text" icon={<Power size={16} />} onClick={handleQuit} style={{ textAlign: 'left' }}>
           Quit Lumabase
         </Button>
       </Space>

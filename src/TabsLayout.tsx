@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Layout, Tabs, Space } from 'antd';
-import { DatabaseOutlined, HomeOutlined } from '@ant-design/icons';
+import { Database, Home } from 'lucide-react';
 import EngineManagerScreen from './screens/EngineManagerScreen';
 import ExplorerScreen from './screens/ExplorerScreen';
 import TitleBar from './components/TitleBar';
@@ -93,7 +93,7 @@ const TabsLayout: React.FC = () => {
           key: tab.key,
           label: (
             <Space>
-              {tab.type === 'engine-manager' ? <HomeOutlined /> : <DatabaseOutlined />}
+              {tab.type === 'engine-manager' ? <Home size={16} /> : <Database size={16} />}
               {tab.label}
             </Space>
           ),
