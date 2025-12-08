@@ -81,6 +81,13 @@ export const useBatchEditor = (
             // Clean up internal flags
             delete finalRow._isNew;
             delete finalRow._tempKey;
+
+            // Sanitize: Remove undefined values to avoid "Bind parameters must not contain undefined"
+            Object.keys(finalRow).forEach(key => {
+                if (finalRow[key] === undefined) {
+                    delete finalRow[key];
+                }
+            });
             
             try {
                 // Expecting DB to return the ID or the full row

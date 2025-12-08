@@ -133,28 +133,13 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>((props
             setDatabases(dbs);
 
             // 2. Get Current DB
+            // 2. Get Current DB
             let current = '';
             try {
-                // Determine DB type by checking list content or catching error? 
-                // Actually, SELECT DATABASE() works in MySQL. 
-                // Postgres uses current_database().
-                // Taking a safe bet: Try MySQL syntax, if it fails/returns key `DATABASE()`, good.
-                // Or better, ipc.listDatabases already tells us if we get `mysql` back it's likely mysql.
-                
-                // Let's use a generic query or check specific known DBs
-                const rows = await ipc.executeQuery(connectionId, 'SELECT DATABASE() as db');
-                if (rows && rows.length > 0) {
-                     // MySQL returns { 'DATABASE()': 'name' } or { db: 'name' } if aliased
-                     // Since we aliased 'as db', it should be 'db'.
-                     current = rows[0].db || Object.values(rows[0])[0]; // Fallback just in case
-                }
+                // Use universal method that handles both MySQL (SELECT DATABASE()) and Postgres (current_database())
+                current = await ipc.getCurrentDatabase(connectionId);
             } catch (e) {
-                // If SELECT DATABASE() fails (e.g. Postgres), try generic fallback or ignore auto-switch for now
-                // Postgres: SELECT current_database();
-                try {
-                     const rows = await ipc.executeQuery(connectionId, 'SELECT current_database() as db');
-                     if (rows && rows.length > 0) current = rows[0].db || Object.values(rows[0])[0];
-                } catch (ignore) {}
+                console.warn('Failed to get current database:', e);
             }
 
             // 3. Selection Logic
@@ -340,6 +325,10 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>((props
           setIsCreateDbModalVisible(false);
           createDbForm.resetFields();
           loadDatabases();
+          
+          if (onOpenDatabase) {
+              onOpenDatabase(values.name);
+          }
       } catch (e: any) {
           message.error(`Failed to create database: ${e.message}`);
       }
@@ -387,8 +376,8 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>((props
           const defaultRow: any = {};
           if (structure && structure.length > 0) {
             structure.forEach((col: any) => {
-                // SKIP Auto-Increment and Defaults for ID
-                if (col.autoIncrement) {
+                // SKIP Auto-Increment and Defaults for ID and PK
+                if (col.autoIncrement || col.pk) {
                     return; // Leave undefined
                 }
                 
@@ -428,6 +417,28 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>((props
           onResize: handleResize(index),
       }),
   }));
+
+  const handleDropTable = (tableName: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      modal.confirm({
+          title: `Delete table "${tableName}"?`,
+          content: 'This action cannot be undone. All data will be lost.',
+          okText: 'Delete',
+          okType: 'danger',
+          onOk: async () => {
+              try {
+                  await ipc.dropTable(connectionId, tableName);
+                  message.success(`Table ${tableName} deleted`);
+                  if (activeTable === tableName) {
+                      setActiveTable(null);
+                  }
+                  loadTables();
+              } catch (e: any) {
+                  message.error(`Failed to delete table: ${e.message}`);
+              }
+          }
+      });
+  };
 
   return (
     <Layout style={{ height: '100%' }}>
@@ -543,6 +554,9 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>((props
                         setActiveTable(null);
                         setPendingFilter(null);
                     } else {
+                        // Prevent navigation if it was the delete button clicked (though stopPropagation in handleDropTable normally handles this, extra safety)
+                        if ((e as any).domEvent && (e as any).domEvent.defaultPrevented) return;
+                        
                         setViewMode('table');
                         setActiveTable(e.key);
                         setPendingFilter(null);
@@ -552,7 +566,28 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>((props
                 items={[
                     { key: 'sql-editor', icon: <Code size={16} />, label: 'SQL Editor', style: { marginBottom: 8 } },
                     { type: 'divider' },
-                    ...tables.map(t => ({ key: t, icon: <TableIcon size={16} />, label: t }))
+                    ...tables.map(t => ({ 
+                        key: t, 
+                        icon: <TableIcon size={16} />, 
+                        label: (
+                            <Dropdown 
+                                menu={{ 
+                                    items: [
+                                        { 
+                                            key: 'delete', 
+                                            label: 'Delete Table', 
+                                            icon: <Trash2 size={14} />, 
+                                            danger: true,
+                                            onClick: ({ domEvent }) => handleDropTable(t, domEvent as any) 
+                                        }
+                                    ] 
+                                }} 
+                                trigger={['contextMenu']}
+                            >
+                                <span style={{ display: 'block', width: '100%' }}>{t}</span>
+                            </Dropdown>
+                        ) 
+                    }))
                 ]}
                 />
             </>

@@ -26,6 +26,7 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
   const [columns, setColumns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
+  const [addForm] = Form.useForm(); // Dedicated form for Adding Columns
   const [editingKey, setEditingKey] = useState('');
   const [fkModalVisible, setFkModalVisible] = useState(false);
   const [selectedColumnForFk, setSelectedColumnForFk] = useState('');
@@ -65,7 +66,7 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
         }
       }]);
       message.success('Column added');
-      form.resetFields();
+      addForm.resetFields(); // Reset the dedicated add form
       loadStructure();
       onSuccess();
     } catch (e: any) {
@@ -116,7 +117,6 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
       setLoading(true);
       
       // We only support modifying type/null/default, not renaming yet (renaming is complex in some DBs)
-      // So we use the original key as the name
       await ipc.updateTableStructure(connectionId, tableName, [{
         type: 'modify_column',
         column: {
@@ -275,7 +275,7 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
       
       <div style={{ marginTop: 24, borderTop: '1px solid #303030', paddingTop: 16 }}>
         <h4>Add New Column</h4>
-        <Form layout="inline" onFinish={handleAddColumn}>
+        <Form layout="inline" form={addForm} onFinish={handleAddColumn}>
           <Form.Item name="name" rules={[{ required: true, message: 'Name req' }]}>
             <Input placeholder="Column Name" />
           </Form.Item>
@@ -307,7 +307,7 @@ const TableStructureEditor: React.FC<Props> = ({ visible, onCancel, tableName, c
       {fkModalVisible && (
         <ForeignKeyModal
             connectionId={connectionId}
-        visible={fkModalVisible}
+            visible={fkModalVisible}
             onCancel={() => setFkModalVisible(false)}
             tableName={tableName}
             columnName={selectedColumnForFk}

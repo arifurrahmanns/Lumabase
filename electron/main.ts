@@ -32,6 +32,21 @@ let tray: Tray | null = null;
 let showInTray = appSettingsManager.getSettings().showInTray;
 let isQuitting = false;
 
+// Global Error Handler to prevent app crashes from background connection issues
+process.on('uncaughtException', (error: any) => {
+    // Check for common connection termination errors from DB drivers
+    if (error.code === 'ECONNRESET' || 
+        error.message?.includes('Connection terminated unexpectedly') ||
+        error.message?.includes('read ECONNRESET')) {
+        console.warn('Caught background connection error (harmless):', error.message);
+        // Do not crash the app
+        return;
+    }
+    
+    // For other errors, log them but still try to keep alive if possible, or rethrow
+    console.error('Uncaught Exception:', error);
+});
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1150,
@@ -157,6 +172,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle('update-row', async (_, { connectionId, tableName, row, primaryKeyColumn, primaryKeyValue }) => {
     return dbManager.updateRow(connectionId, tableName, row, primaryKeyColumn, primaryKeyValue);
+  });
+
+  ipcMain.handle('get-current-database', async (_, connectionId) => {
+    return dbManager.getCurrentDatabase(connectionId);
   });
 
   ipcMain.handle('delete-row', async (_, { connectionId, tableName, primaryKeyColumn, primaryKeyValue }) => {

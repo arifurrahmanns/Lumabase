@@ -6,14 +6,25 @@ export class PostgresAdapter {
 
   async connect(config: any) {
     this.config = config;
+    console.log('PostgresAdapter connecting to:', config.host, config.port);
     try {
       this.client = new Client({
         ...config,
-        port: parseInt(config.port) || 5432
+        port: parseInt(config.port) || 5432,
+        connectionTimeoutMillis: 5000 // Timeout after 5s to prevent hanging
       });
+
+      // Handle unexpected connection errors (e.g., engine stopped) preventing app crash
+      this.client.on('error', (err: any) => {
+          console.error('Postgres Client Error (connection lost):', err.message);
+          // We don't need to rethrow/crash, subsequent queries will fail gracefully
+      });
+
       await this.client.connect();
+      console.log('PostgresAdapter connected successfully');
       return { success: true };
     } catch (error: any) {
+      console.error('PostgresAdapter connection failed:', error);
       return { success: false, error: error.message };
     }
   }
@@ -151,17 +162,66 @@ export class PostgresAdapter {
   async getTableStructure(tableName: string) {
     if (!this.client) throw new Error('Database not connected');
     const sql = `
-      SELECT column_name, data_type, is_nullable, column_default
-      FROM information_schema.columns
-      WHERE table_name = $1
+      SELECT 
+        c.column_name, 
+        c.data_type, 
+        c.is_nullable, 
+        c.column_default,
+        (
+           SELECT 1 
+           FROM information_schema.key_column_usage kcu 
+           JOIN information_schema.table_constraints tc 
+             ON kcu.constraint_name = tc.constraint_name 
+             AND kcu.table_schema = tc.table_schema
+           WHERE kcu.table_name = c.table_name 
+             AND kcu.column_name = c.column_name 
+             AND tc.constraint_type = 'PRIMARY KEY'
+             AND kcu.table_schema = 'public'
+           LIMIT 1
+        ) as is_pk
+      FROM information_schema.columns c
+      WHERE c.table_name = $1
+      AND c.table_schema = 'public'
     `;
     const res = await this.client.query(sql, [tableName]);
+    
+    // Fetch Foreign Keys
+    const fkSql = `
+      SELECT
+        kcu.column_name,
+        ccu.table_name AS foreign_table_name,
+        ccu.column_name AS foreign_column_name,
+        tc.constraint_name
+      FROM
+        information_schema.table_constraints AS tc
+        JOIN information_schema.key_column_usage AS kcu
+          ON tc.constraint_name = kcu.constraint_name
+          AND tc.table_schema = kcu.table_schema
+        JOIN information_schema.constraint_column_usage AS ccu
+          ON ccu.constraint_name = tc.constraint_name
+          AND ccu.table_schema = tc.table_schema
+      WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1 AND tc.table_schema = 'public'
+    `;
+    const fkRes = await this.client.query(fkSql, [tableName]);
+    
+    const fkMap = new Map();
+    fkRes.rows.forEach((fk: any) => {
+        fkMap.set(fk.column_name, {
+            table: fk.foreign_table_name,
+            column: fk.foreign_column_name,
+            constraintName: fk.constraint_name
+        });
+    });
+
     return res.rows.map((row: any) => ({
       name: row.column_name,
       type: row.data_type,
       notnull: row.is_nullable === 'NO' ? 1 : 0,
       dflt_value: row.column_default,
-      pk: 0 // Fetching PKs in PG is more complex, skipping for MVP or need extra query
+      pk: row.is_pk,
+      // Simple heuristic for auto_increment in PG: default value contains 'nextval'
+      autoIncrement: row.column_default && row.column_default.includes('nextval') ? 1 : 0,
+      fk: fkMap.get(row.column_name) || null
     }));
   }
 
@@ -301,5 +361,11 @@ export class PostgresAdapter {
           await this.client.query(`ALTER USER "${username}" WITH PASSWORD '${password}'`);
       }
       return { success: true };
+  }
+
+  async getCurrentDatabase() {
+      if (!this.client) throw new Error('Database not connected');
+      const res = await this.client.query('SELECT current_database()');
+      return res.rows[0]?.current_database || '';
   }
 }

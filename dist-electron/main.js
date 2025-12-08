@@ -187,6 +187,7 @@ class MysqlAdapter {
       notnull: row.Null === "NO" ? 1 : 0,
       dflt_value: row.Default,
       pk: row.Key === "PRI" ? 1 : 0,
+      autoIncrement: row.Extra && row.Extra.includes("auto_increment") ? 1 : 0,
       fk: fkMap.get(row.Field) || null
     }));
   }
@@ -296,6 +297,12 @@ class MysqlAdapter {
     }
     return { success: true };
   }
+  async getCurrentDatabase() {
+    var _a;
+    if (!this.connection) throw new Error("Database not connected");
+    const [rows] = await this.connection.execute("SELECT DATABASE() as db");
+    return ((_a = rows[0]) == null ? void 0 : _a.db) || "";
+  }
 }
 class PostgresAdapter {
   constructor() {
@@ -304,14 +311,22 @@ class PostgresAdapter {
   }
   async connect(config2) {
     this.config = config2;
+    console.log("PostgresAdapter connecting to:", config2.host, config2.port);
     try {
       this.client = new pg.Client({
         ...config2,
-        port: parseInt(config2.port) || 5432
+        port: parseInt(config2.port) || 5432,
+        connectionTimeoutMillis: 5e3
+        // Timeout after 5s to prevent hanging
+      });
+      this.client.on("error", (err) => {
+        console.error("Postgres Client Error (connection lost):", err.message);
       });
       await this.client.connect();
+      console.log("PostgresAdapter connected successfully");
       return { success: true };
     } catch (error) {
+      console.error("PostgresAdapter connection failed:", error);
       return { success: false, error: error.message };
     }
   }
@@ -425,18 +440,62 @@ class PostgresAdapter {
   async getTableStructure(tableName) {
     if (!this.client) throw new Error("Database not connected");
     const sql = `
-      SELECT column_name, data_type, is_nullable, column_default
-      FROM information_schema.columns
-      WHERE table_name = $1
+      SELECT 
+        c.column_name, 
+        c.data_type, 
+        c.is_nullable, 
+        c.column_default,
+        (
+           SELECT 1 
+           FROM information_schema.key_column_usage kcu 
+           JOIN information_schema.table_constraints tc 
+             ON kcu.constraint_name = tc.constraint_name 
+             AND kcu.table_schema = tc.table_schema
+           WHERE kcu.table_name = c.table_name 
+             AND kcu.column_name = c.column_name 
+             AND tc.constraint_type = 'PRIMARY KEY'
+             AND kcu.table_schema = 'public'
+           LIMIT 1
+        ) as is_pk
+      FROM information_schema.columns c
+      WHERE c.table_name = $1
+      AND c.table_schema = 'public'
     `;
     const res = await this.client.query(sql, [tableName]);
+    const fkSql = `
+      SELECT
+        kcu.column_name,
+        ccu.table_name AS foreign_table_name,
+        ccu.column_name AS foreign_column_name,
+        tc.constraint_name
+      FROM
+        information_schema.table_constraints AS tc
+        JOIN information_schema.key_column_usage AS kcu
+          ON tc.constraint_name = kcu.constraint_name
+          AND tc.table_schema = kcu.table_schema
+        JOIN information_schema.constraint_column_usage AS ccu
+          ON ccu.constraint_name = tc.constraint_name
+          AND ccu.table_schema = tc.table_schema
+      WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1 AND tc.table_schema = 'public'
+    `;
+    const fkRes = await this.client.query(fkSql, [tableName]);
+    const fkMap = /* @__PURE__ */ new Map();
+    fkRes.rows.forEach((fk) => {
+      fkMap.set(fk.column_name, {
+        table: fk.foreign_table_name,
+        column: fk.foreign_column_name,
+        constraintName: fk.constraint_name
+      });
+    });
     return res.rows.map((row) => ({
       name: row.column_name,
       type: row.data_type,
       notnull: row.is_nullable === "NO" ? 1 : 0,
       dflt_value: row.column_default,
-      pk: 0
-      // Fetching PKs in PG is more complex, skipping for MVP or need extra query
+      pk: row.is_pk,
+      // Simple heuristic for auto_increment in PG: default value contains 'nextval'
+      autoIncrement: row.column_default && row.column_default.includes("nextval") ? 1 : 0,
+      fk: fkMap.get(row.column_name) || null
     }));
   }
   async updateTableStructure(tableName, actions) {
@@ -559,6 +618,12 @@ class PostgresAdapter {
     }
     return { success: true };
   }
+  async getCurrentDatabase() {
+    var _a;
+    if (!this.client) throw new Error("Database not connected");
+    const res = await this.client.query("SELECT current_database()");
+    return ((_a = res.rows[0]) == null ? void 0 : _a.current_database) || "";
+  }
 }
 class DatabaseManager {
   constructor() {
@@ -578,7 +643,10 @@ class DatabaseManager {
       throw new Error(`Unsupported database type: ${config2.type}`);
     }
     try {
-      await adapter.connect(config2);
+      const result = await adapter.connect(config2);
+      if (!result.success) {
+        return result;
+      }
       const connectionId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
       this.connections.set(connectionId, adapter);
       return { success: true, connectionId };
@@ -688,6 +756,9 @@ class DatabaseManager {
   }
   async updateUser(connectionId, user) {
     return this.getAdapter(connectionId).updateUser(user);
+  }
+  async getCurrentDatabase(connectionId) {
+    return this.getAdapter(connectionId).getCurrentDatabase();
   }
 }
 const dbManager = new DatabaseManager();
@@ -12513,14 +12584,7 @@ var _eval = EvalError;
 var range = RangeError;
 var ref = ReferenceError;
 var syntax = SyntaxError;
-var type;
-var hasRequiredType;
-function requireType() {
-  if (hasRequiredType) return type;
-  hasRequiredType = 1;
-  type = TypeError;
-  return type;
-}
+var type = TypeError;
 var uri = URIError;
 var abs$1 = Math.abs;
 var floor$1 = Math.floor;
@@ -12766,7 +12830,7 @@ function requireCallBindApplyHelpers() {
   if (hasRequiredCallBindApplyHelpers) return callBindApplyHelpers;
   hasRequiredCallBindApplyHelpers = 1;
   var bind3 = functionBind;
-  var $TypeError2 = requireType();
+  var $TypeError2 = type;
   var $call2 = requireFunctionCall();
   var $actualApply = requireActualApply();
   callBindApplyHelpers = function callBindBasic(args) {
@@ -12839,7 +12903,7 @@ var $EvalError = _eval;
 var $RangeError = range;
 var $ReferenceError = ref;
 var $SyntaxError = syntax;
-var $TypeError$1 = requireType();
+var $TypeError$1 = type;
 var $URIError = uri;
 var abs = abs$1;
 var floor = floor$1;
@@ -13170,7 +13234,7 @@ var GetIntrinsic2 = getIntrinsic;
 var $defineProperty = GetIntrinsic2("%Object.defineProperty%", true);
 var hasToStringTag = requireShams()();
 var hasOwn$1 = hasown;
-var $TypeError = requireType();
+var $TypeError = type;
 var toStringTag = hasToStringTag ? Symbol.toStringTag : null;
 var esSetTostringtag = function setToStringTag(object, value) {
   var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
@@ -20561,8 +20625,17 @@ class EngineController extends events$1.EventEmitter {
     if (existing) {
       throw new Error(`Instance with name "${instance.name}" already exists`);
     }
-    if (!fs__namespace.existsSync(instance.binaryPath)) {
-      console.log(`Binary not found for ${instance.name}. Attempting download...`);
+    let binaryExists = fs__namespace.existsSync(instance.binaryPath);
+    if (binaryExists && instance.type === "postgres") {
+      const binDir = path__namespace.dirname(instance.binaryPath);
+      const initdbPath = path__namespace.join(binDir, process.platform === "win32" ? "initdb.exe" : "initdb");
+      if (!fs__namespace.existsSync(initdbPath)) {
+        console.log(`initdb not found at ${initdbPath}. marking install as corrupt.`);
+        binaryExists = false;
+      }
+    }
+    if (!binaryExists) {
+      console.log(`Binary (or dependencies) not found for ${instance.name}. Attempting download...`);
       try {
         const version2 = instance.version || (instance.type === "mysql" ? "8.0" : "14");
         const installDir = path__namespace.dirname(instance.dataDir);
@@ -20668,14 +20741,48 @@ class EngineController extends events$1.EventEmitter {
         if (!fs__namespace.existsSync(instance.dataDir)) {
           fs__namespace.mkdirSync(instance.dataDir, { recursive: true });
         }
+        try {
+          const binDir = path__namespace.dirname(instance.binaryPath);
+          const pgCtlPath = path__namespace.join(binDir, process.platform === "win32" ? "pg_ctl.exe" : "pg_ctl");
+          if (fs__namespace.existsSync(pgCtlPath)) {
+            console.log("Attempting cleanup with pg_ctl stop -m immediate...");
+            try {
+              require$$0$1.execSync(`"${pgCtlPath}" stop -D "${instance.dataDir}" -m immediate`, { stdio: "ignore" });
+            } catch (e) {
+            }
+          } else {
+            const pidFile = path__namespace.join(instance.dataDir, "postmaster.pid");
+            if (fs__namespace.existsSync(pidFile)) {
+              try {
+                console.log("Found stale postmaster.pid. Removing it...");
+                fs__namespace.unlinkSync(pidFile);
+              } catch (e) {
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Cleanup failed:", e);
+        }
         const pgVersionFile = path__namespace.join(instance.dataDir, "PG_VERSION");
         if (!fs__namespace.existsSync(pgVersionFile)) {
           console.log(`Initializing Postgres data directory: ${instance.dataDir}`);
           try {
-            const binDir = path__namespace.dirname(instance.binaryPath);
-            const initdbPath = path__namespace.join(binDir, process.platform === "win32" ? "initdb.exe" : "initdb");
+            let binDir = path__namespace.dirname(instance.binaryPath);
+            let initdbPath = path__namespace.join(binDir, process.platform === "win32" ? "initdb.exe" : "initdb");
             if (!fs__namespace.existsSync(initdbPath)) {
-              throw new Error(`initdb not found at ${initdbPath}. Cannot initialize.`);
+              console.log(`initdb not found at ${initdbPath}. Installation appears corrupt. Attempting repair via re-download...`);
+              this.updateStatus(id, "starting");
+              const version2 = instance.version || "14";
+              const installDir = path__namespace.dirname(instance.dataDir);
+              const newBinaryPath = await downloadEngine("postgres", version2, installDir);
+              instance.binaryPath = newBinaryPath;
+              this.configManager.updateInstance(id, { binaryPath: newBinaryPath });
+              binDir = path__namespace.dirname(instance.binaryPath);
+              initdbPath = path__namespace.join(binDir, process.platform === "win32" ? "initdb.exe" : "initdb");
+              if (!fs__namespace.existsSync(initdbPath)) {
+                throw new Error(`Repair failed. initdb still not found at ${initdbPath}`);
+              }
+              console.log("Engine repaired successfully.");
             }
             require$$0$1.execSync(`"${initdbPath}" -D "${instance.dataDir}" -U postgres --auth=trust`);
           } catch (e) {
@@ -20848,6 +20955,14 @@ const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 let tray = null;
 let showInTray = appSettingsManager.getSettings().showInTray;
 let isQuitting = false;
+process.on("uncaughtException", (error) => {
+  var _a, _b;
+  if (error.code === "ECONNRESET" || ((_a = error.message) == null ? void 0 : _a.includes("Connection terminated unexpectedly")) || ((_b = error.message) == null ? void 0 : _b.includes("read ECONNRESET"))) {
+    console.warn("Caught background connection error (harmless):", error.message);
+    return;
+  }
+  console.error("Uncaught Exception:", error);
+});
 function createWindow() {
   win = new electron.BrowserWindow({
     width: 1150,
@@ -20940,6 +21055,9 @@ electron.app.whenReady().then(() => {
   });
   electron.ipcMain.handle("update-row", async (_, { connectionId, tableName, row, primaryKeyColumn, primaryKeyValue }) => {
     return dbManager.updateRow(connectionId, tableName, row, primaryKeyColumn, primaryKeyValue);
+  });
+  electron.ipcMain.handle("get-current-database", async (_, connectionId) => {
+    return dbManager.getCurrentDatabase(connectionId);
   });
   electron.ipcMain.handle("delete-row", async (_, { connectionId, tableName, primaryKeyColumn, primaryKeyValue }) => {
     return dbManager.deleteRow(connectionId, tableName, primaryKeyColumn, primaryKeyValue);

@@ -180,6 +180,7 @@ export class MysqlAdapter {
       notnull: row.Null === 'NO' ? 1 : 0,
       dflt_value: row.Default,
       pk: row.Key === 'PRI' ? 1 : 0,
+      autoIncrement: row.Extra && row.Extra.includes('auto_increment') ? 1 : 0,
       fk: fkMap.get(row.Field) || null
     }));
   }
@@ -309,5 +310,11 @@ export class MysqlAdapter {
           await this.connection.execute(`ALTER USER ?@? IDENTIFIED BY ?`, [username, host, password]);
       }
       return { success: true };
+  }
+
+  async getCurrentDatabase() {
+      if (!this.connection) throw new Error('Database not connected');
+      const [rows]: [any[], any] = await this.connection.execute("SELECT DATABASE() as db");
+      return rows[0]?.db || '';
   }
 }

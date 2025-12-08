@@ -20,6 +20,7 @@ export const ipc = {
   createDatabase: (connectionId: string, name: string) => window.electron.ipcRenderer.invoke('create-database', { connectionId, name }),
   dropDatabase: (connectionId: string, name: string) => window.electron.ipcRenderer.invoke('drop-database', { connectionId, name }),
   switchDatabase: (connectionId: string, name: string) => window.electron.ipcRenderer.invoke('switch-database', { connectionId, name }),
+  getCurrentDatabase: (connectionId: string) => window.electron.ipcRenderer.invoke('get-current-database', connectionId),
   
   // User Management
   listUsers: (connectionId: string) => window.electron.ipcRenderer.invoke('list-users', connectionId),

@@ -103,8 +103,20 @@ export class EngineController extends EventEmitter {
     }
 
     // Check if binary exists, if not, try to download
-    if (!fs.existsSync(instance.binaryPath)) {
-        console.log(`Binary not found for ${instance.name}. Attempting download...`);
+    let binaryExists = fs.existsSync(instance.binaryPath);
+    
+    // For Postgres, also verify initdb exists, otherwise it's a corrupted/partial install
+    if (binaryExists && instance.type === 'postgres') {
+        const binDir = path.dirname(instance.binaryPath);
+        const initdbPath = path.join(binDir, process.platform === 'win32' ? 'initdb.exe' : 'initdb');
+        if (!fs.existsSync(initdbPath)) {
+            console.log(`initdb not found at ${initdbPath}. marking install as corrupt.`);
+            binaryExists = false;
+        }
+    }
+
+    if (!binaryExists) {
+        console.log(`Binary (or dependencies) not found for ${instance.name}. Attempting download...`);
         try {
             // Determine version from instance or default
             const version = instance.version || (instance.type === 'mysql' ? '8.0' : '14');
@@ -237,15 +249,60 @@ export class EngineController extends EventEmitter {
             fs.mkdirSync(instance.dataDir, { recursive: true });
         }
 
+        // Cleanup: Try to stop any existing instance aggressively using pg_ctl
+        // This handles "pre-existing shared memory block" errors better than just deleting the PID file
+        try {
+            const binDir = path.dirname(instance.binaryPath);
+            const pgCtlPath = path.join(binDir, process.platform === 'win32' ? 'pg_ctl.exe' : 'pg_ctl');
+            
+            if (fs.existsSync(pgCtlPath)) {
+                console.log('Attempting cleanup with pg_ctl stop -m immediate...');
+                try {
+                    execSync(`"${pgCtlPath}" stop -D "${instance.dataDir}" -m immediate`, { stdio: 'ignore' });
+                } catch (e) {
+                    // Ignore error if it wasn't running
+                }
+            } else {
+                 // Fallback: If pg_ctl missing, check/remove stale PID file manually
+                 const pidFile = path.join(instance.dataDir, 'postmaster.pid');
+                 if (fs.existsSync(pidFile)) {
+                    try {
+                        console.log('Found stale postmaster.pid. Removing it...');
+                        fs.unlinkSync(pidFile);
+                    } catch (e) {}
+                 }
+            }
+        } catch (e) {
+            console.error('Cleanup failed:', e);
+        }
+
         const pgVersionFile = path.join(instance.dataDir, 'PG_VERSION');
         if (!fs.existsSync(pgVersionFile)) {
              console.log(`Initializing Postgres data directory: ${instance.dataDir}`);
              try {
-                 const binDir = path.dirname(instance.binaryPath);
-                 const initdbPath = path.join(binDir, process.platform === 'win32' ? 'initdb.exe' : 'initdb');
+                 let binDir = path.dirname(instance.binaryPath);
+                 let initdbPath = path.join(binDir, process.platform === 'win32' ? 'initdb.exe' : 'initdb');
                  
+                 // Self-repair: If initdb is missing, re-download the engine
                  if (!fs.existsSync(initdbPath)) {
-                     throw new Error(`initdb not found at ${initdbPath}. Cannot initialize.`);
+                     console.log(`initdb not found at ${initdbPath}. Installation appears corrupt. Attempting repair via re-download...`);
+                     this.updateStatus(id, 'starting'); // Ensure status is starting
+                     
+                     const version = instance.version || '14';
+                     const installDir = path.dirname(instance.dataDir);
+                     
+                     const newBinaryPath = await downloadEngine('postgres', version, installDir);
+                     instance.binaryPath = newBinaryPath;
+                     this.configManager.updateInstance(id, { binaryPath: newBinaryPath });
+                     
+                     // Re-calculate paths
+                     binDir = path.dirname(instance.binaryPath);
+                     initdbPath = path.join(binDir, process.platform === 'win32' ? 'initdb.exe' : 'initdb');
+                     
+                     if (!fs.existsSync(initdbPath)) {
+                         throw new Error(`Repair failed. initdb still not found at ${initdbPath}`);
+                     }
+                     console.log('Engine repaired successfully.');
                  }
 
                  execSync(`"${initdbPath}" -D "${instance.dataDir}" -U postgres --auth=trust`);

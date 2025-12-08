@@ -1,3 +1,94 @@
+import React, { useState, useRef } from 'react';
+import { Layout, Tabs, Space, message } from 'antd';
+import { Database, Home } from 'lucide-react';
+import EngineManagerScreen from './screens/EngineManagerScreen';
+import ExplorerScreen from './screens/ExplorerScreen';
+import TitleBar from './components/TitleBar';
+import { ipc } from './renderer/ipc';
+
+interface Tab {
+  key: string;
+  label: string;
+  type: 'engine-manager' | 'explorer';
+  connectionId?: string;
+  engineName?: string;
+  closable?: boolean;
+}
+
+const TabsLayout: React.FC = () => {
+  const [activeKey, setActiveKey] = useState('home');
+  const [tabs, setTabs] = useState<Tab[]>([
+    { key: 'home', label: 'Engines', type: 'engine-manager', closable: false }
+  ]);
+  const tabRefs = useRef<Record<string, any>>({});
+
+  const handleConnect = (connectionId: string, engineName: string) => {
+    const newKey = `tab-${Date.now()}`;
+    const newTab: Tab = {
+      key: newKey,
+      label: engineName,
+      type: 'explorer',
+      connectionId: connectionId,
+      engineName: engineName,
+      closable: true,
+    };
+    setTabs([...tabs, newTab]);
+    setActiveKey(newKey);
+  };
+
+  const handleAddTab = () => {
+    // For now, adding a tab opens the Engine Manager
+    const newKey = `new-tab-${Date.now()}`;
+    const newTab: Tab = {
+        key: newKey,
+        label: 'New Tab',
+        type: 'engine-manager',
+        closable: true
+    };
+    setTabs([...tabs, newTab]);
+    setActiveKey(newKey);
+  };
+
+  const onEdit = (targetKey: any, action: 'add' | 'remove') => {
+    if (action === 'remove') {
+      removeTab(targetKey);
+    }
+  };
+
+  const removeTab = (targetKey: string) => {
+    const targetIndex = tabs.findIndex((pane) => pane.key === targetKey);
+    const newTabs = tabs.filter((pane) => pane.key !== targetKey);
+    if (newTabs.length && targetKey === activeKey) {
+      const { key } = newTabs[targetIndex === newTabs.length ? targetIndex - 1 : targetIndex];
+      setActiveKey(key);
+    }
+
+    setTabs(newTabs);
+    // Remove ref
+    if (tabRefs.current[targetKey]) {
+        delete tabRefs.current[targetKey];
+    }
+    // TODO: Ideally close connection on backend too
+  };
+
+  const handleRefresh = () => {
+      const activeRef = tabRefs.current[activeKey];
+      if (activeRef && activeRef.refresh) {
+          activeRef.refresh();
+      }
+  };
+
+  const handleMenuAction = (action: string) => {
+      const activeRef = tabRefs.current[activeKey];
+      if (!activeRef) return;
+
+      if (action === 'delete-database') {
+          if (activeRef.deleteCurrentDatabase) {
+              activeRef.deleteCurrentDatabase();
+          }
+      }
+  };
+
   const handleOpenDatabase = async (sourceConnectionId: string, dbName: string) => {
       try {
           const res = await ipc.cloneConnection(sourceConnectionId, dbName);

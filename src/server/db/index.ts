@@ -22,6 +22,7 @@ interface DatabaseAdapter {
   createUser(user: any): Promise<any>;
   dropUser(username: string, host?: string): Promise<any>;
   updateUser(user: any): Promise<any>;
+  getCurrentDatabase(): Promise<string>;
 }
 
 class DatabaseManager {
@@ -43,7 +44,10 @@ class DatabaseManager {
     }
 
     try {
-        await adapter.connect(config);
+        const result = await adapter.connect(config);
+        if (!result.success) {
+            return result;
+        }
         const connectionId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
         this.connections.set(connectionId, adapter);
         return { success: true, connectionId };
@@ -124,6 +128,7 @@ class DatabaseManager {
   async createUser(connectionId: string, user: any) { return this.getAdapter(connectionId).createUser(user); }
   async dropUser(connectionId: string, username: string, host?: string) { return this.getAdapter(connectionId).dropUser(username, host); }
   async updateUser(connectionId: string, user: any) { return this.getAdapter(connectionId).updateUser(user); }
+  async getCurrentDatabase(connectionId: string) { return this.getAdapter(connectionId).getCurrentDatabase(); }
 }
 
 export const dbManager = new DatabaseManager();
