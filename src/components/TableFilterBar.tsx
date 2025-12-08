@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Button, Select, Input, Space, Row, Col } from 'antd';
-import { Plus, X, Filter, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Button, Select, Input } from 'antd';
+import { Plus, X } from 'lucide-react';
 
 interface FilterCondition {
     id: number;

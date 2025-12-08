@@ -102,19 +102,7 @@ export class MysqlAdapter {
       let whereClause = '';
       const params = [updateVal];
 
-      conditions.forEach((cond, index) => {
-          const op = cond.operator.toUpperCase();
-          const allowedOps = ['=', '!=', '<', '>', '<=', '>=', 'LIKE'];
-          if (!allowedOps.includes(op)) throw new Error(`Invalid operator: ${op}`);
 
-          const prefix = index === 0 ? 'WHERE' : 'AND';
-          whereClause += ` \`${cond.column}\` ${op} ?`;
-          // Prepend WHERE/AND manually or handle cleanly
-          if (index === 0) {
-             // Logic fix: The line above added the condition, but we need to join them.
-             // Actually, let's rewrite the loop logic to be cleaner.
-          }
-      });
       
       // Let's rely on map/join for better safety
       const clauses = conditions.map(cond => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Select, Input, Space, Row, Col } from 'antd';
-import { Plus, X, Trash2 } from 'lucide-react';
+import { Modal, Button, Select, Input } from 'antd';
+import { Plus, Trash2 } from 'lucide-react';
+
 
 interface FilterCondition {
     id: number;

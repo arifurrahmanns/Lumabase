@@ -4,7 +4,7 @@ import { PostgresAdapter } from './postgresAdapter';
 interface DatabaseAdapter {
   connect(config: any): Promise<any>;
   listTables(): Promise<string[]>;
-  getTableData(tableName: string): Promise<any[]>;
+  getTableData(tableName: string, conditions?: any[]): Promise<any[]>;
   addRow(tableName: string, row: any): Promise<any>;
   updateRow(tableName: string, row: any, pkCol: string, pkVal: any): Promise<any>;
   deleteRow(tableName: string, pkCol: string, pkVal: any): Promise<any>;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Input, InputNumber, DatePicker, Radio, Button, Space, message, Row, Col, Tag, Alert } from 'antd';
-import { Plus, Trash2 } from 'lucide-react';
+import { Modal, Form, Select, Input, InputNumber, DatePicker } from 'antd';
+
 import dayjs from 'dayjs';
 
 interface BulkEditModalProps {
@@ -79,7 +79,7 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({ visible, columns, selecte
     };
 
     const editableColumns = columns.filter(c => !c.autoIncrement && c.name !== 'id');
-    const filterableColumns = columns; // All columns can be used in filters
+
 
     return (
         <Modal
