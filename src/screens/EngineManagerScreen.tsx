@@ -1,6 +1,7 @@
 import { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
-import { Layout, Table, Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Progress, Tooltip } from 'antd';
-import { PlusOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined, ReloadOutlined, ExportOutlined, EditOutlined } from '@ant-design/icons';
+import { Layout, Table, Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Progress, Tooltip, Dropdown } from 'antd';
+import type { MenuProps } from 'antd';
+import { PlusOutlined, PlayCircleOutlined, PauseCircleOutlined, DeleteOutlined, ReloadOutlined, ExportOutlined, EditOutlined, SettingOutlined } from '@ant-design/icons';
 import { ipc } from '../renderer/ipc';
 
 const { Content } = Layout;
@@ -282,53 +283,70 @@ const EngineManagerScreen = forwardRef<EngineManagerScreenRef, EngineManagerScre
       key: 'actions',
       width: 70,
       align: 'center' as const,
-      render: (_: any, record: EngineInstance) => (
-        <Space>
-          {record.status === 'running' ? (
-            <>
+      render: (_: any, record: EngineInstance) => {
+        const items: MenuProps['items'] = [
+            {
+                key: 'edit',
+                label: 'Edit Configuration',
+                icon: <EditOutlined />,
+                disabled: record.status !== 'stopped',
+                onClick: () => handleEdit(record)
+            },
+            {
+                key: 'remove',
+                label: 'Remove Instance',
+                icon: <DeleteOutlined />,
+                danger: true,
+                disabled: record.status === 'running',
+                onClick: () => handleRemove(record.id)
+            }
+        ];
+
+        return (
+            <Space>
+              {record.status === 'running' && (
                 <Tooltip title="Open">
                     <Button 
                       icon={<ExportOutlined />} 
                       type="primary"
+                      size="small"
+                      style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
                       onClick={() => handleOpen(record)}
                     />
                 </Tooltip>
+              )}
+              
+              {record.status === 'running' ? (
                 <Tooltip title="Stop">
                     <Button 
                       icon={<PauseCircleOutlined />} 
                       type="primary"
                       danger 
+                      size="small"
                       onClick={() => handleStop(record.id)}
                     />
                 </Tooltip>
-            </>
-          ) : (
-            <Tooltip title="Start">
-                <Button 
-                  icon={<PlayCircleOutlined />} 
-                  type="primary" 
-                  onClick={() => handleStart(record.id)}
-                  disabled={record.status === 'starting'}
-                />
-            </Tooltip>
-          )}
-          <Tooltip title="Edit">
-            <Button 
-                icon={<EditOutlined />} 
-                onClick={() => handleEdit(record)}
-                disabled={record.status !== 'stopped'}
-            />
-          </Tooltip>
-          <Tooltip title="Remove">
-              <Button 
-                icon={<DeleteOutlined />} 
-                onClick={() => handleRemove(record.id)}
-                disabled={record.status === 'running'}
-                style={{ color: 'var(--foreground)', borderColor: 'var(--foreground)' }}
-              />
-          </Tooltip>
-        </Space>
-      ),
+              ) : (
+                <Tooltip title="Start">
+                    <Button 
+                      icon={<PlayCircleOutlined />} 
+                      type="primary" 
+                      size="small"
+                      onClick={() => handleStart(record.id)}
+                      disabled={record.status === 'starting'}
+                    />
+                </Tooltip>
+              )}
+
+              <Dropdown menu={{ items }} placement="bottomRight" trigger={['click']}>
+                  <Button 
+                    icon={<SettingOutlined />} 
+                    size="small"
+                  />
+              </Dropdown>
+            </Space>
+        );
+      },
     },
   ];
 
