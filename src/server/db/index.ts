@@ -77,6 +77,10 @@ class DatabaseManager {
       return adapter;
   }
 
+  async getConnectionConfig(connectionId: string) {
+      return this.getAdapter(connectionId).getConfig();
+  }
+
   // Proxy methods to the active adapter
   // Proxy methods to the active adapter
   async listTables(connectionId: string) { return this.getAdapter(connectionId).listTables(); }

@@ -672,6 +672,9 @@ class DatabaseManager {
     if (!adapter) throw new Error(`Connection ${connectionId} not found`);
     return adapter;
   }
+  async getConnectionConfig(connectionId) {
+    return this.getAdapter(connectionId).getConfig();
+  }
   // Proxy methods to the active adapter
   // Proxy methods to the active adapter
   async listTables(connectionId) {
@@ -12584,7 +12587,14 @@ var _eval = EvalError;
 var range = RangeError;
 var ref = ReferenceError;
 var syntax = SyntaxError;
-var type = TypeError;
+var type;
+var hasRequiredType;
+function requireType() {
+  if (hasRequiredType) return type;
+  hasRequiredType = 1;
+  type = TypeError;
+  return type;
+}
 var uri = URIError;
 var abs$1 = Math.abs;
 var floor$1 = Math.floor;
@@ -12830,7 +12840,7 @@ function requireCallBindApplyHelpers() {
   if (hasRequiredCallBindApplyHelpers) return callBindApplyHelpers;
   hasRequiredCallBindApplyHelpers = 1;
   var bind3 = functionBind;
-  var $TypeError2 = type;
+  var $TypeError2 = requireType();
   var $call2 = requireFunctionCall();
   var $actualApply = requireActualApply();
   callBindApplyHelpers = function callBindBasic(args) {
@@ -12903,7 +12913,7 @@ var $EvalError = _eval;
 var $RangeError = range;
 var $ReferenceError = ref;
 var $SyntaxError = syntax;
-var $TypeError$1 = type;
+var $TypeError$1 = requireType();
 var $URIError = uri;
 var abs = abs$1;
 var floor = floor$1;
@@ -13234,7 +13244,7 @@ var GetIntrinsic2 = getIntrinsic;
 var $defineProperty = GetIntrinsic2("%Object.defineProperty%", true);
 var hasToStringTag = requireShams()();
 var hasOwn$1 = hasown;
-var $TypeError = type;
+var $TypeError = requireType();
 var toStringTag = hasToStringTag ? Symbol.toStringTag : null;
 var esSetTostringtag = function setToStringTag(object, value) {
   var overrideIfSet = arguments.length > 2 && !!arguments[2] && arguments[2].force;
@@ -21044,6 +21054,9 @@ electron.app.whenReady().then(() => {
   electron.ipcMain.handle("test-connection", async (_, config2) => {
     return dbManager.connect(config2);
   });
+  electron.ipcMain.handle("get-connection-config", async (_, connectionId) => {
+    return dbManager.getConnectionConfig(connectionId);
+  });
   electron.ipcMain.handle("list-tables", async (_, connectionId) => {
     return dbManager.listTables(connectionId);
   });
@@ -21237,6 +21250,9 @@ electron.app.whenReady().then(() => {
   };
   engineController.on("change", (instances) => {
     updateTrayMenu(instances);
+    if (win) {
+      win.webContents.send("engine-status-change", instances);
+    }
   });
   electron.ipcMain.handle("get-app-settings", () => {
     return {

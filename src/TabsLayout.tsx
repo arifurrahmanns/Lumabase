@@ -129,7 +129,7 @@ const TabsLayout: React.FC = () => {
         items={tabs.map(tab => ({
           key: tab.key,
           label: (
-            <Space>
+            <Space align="center">
               {tab.type === 'engine-manager' ? <Home size={16} /> : <Database size={16} />}
               {tab.label}
             </Space>

@@ -2,6 +2,7 @@ export const ipc = {
   connectDatabase: (config: any) => window.electron.ipcRenderer.invoke('connect-database', config),
   cloneConnection: (connectionId: string, newDbName: string) => window.electron.ipcRenderer.invoke('clone-connection', { connectionId, newDbName }),
   testConnection: (config: any) => window.electron.ipcRenderer.invoke('test-connection', config),
+  getConnectionConfig: (connectionId: string) => window.electron.ipcRenderer.invoke('get-connection-config', connectionId),
   listTables: (connectionId: string) => window.electron.ipcRenderer.invoke('list-tables', connectionId),
   getTableData: (connectionId: string, tableName: string, conditions: any[] = []) => window.electron.ipcRenderer.invoke('get-table-data', { connectionId, tableName, conditions }),
   addRow: (connectionId: string, tableName: string, row: any) => window.electron.ipcRenderer.invoke('add-row', { connectionId, tableName, row }),
@@ -37,6 +38,7 @@ export const ipc = {
   updateEngine: (id: string, updates: any) => window.electron.ipcRenderer.invoke('engine-update', { id, updates }),
   getDefaultEnginePaths: () => window.electron.ipcRenderer.invoke('get-default-engine-paths'),
   onDownloadProgress: (callback: (percent: number) => void) => window.electron.ipcRenderer.on('engine-download-progress', (_, percent) => callback(percent)),
+  onEngineStatusChange: (callback: (instances: any[]) => void) => window.electron.ipcRenderer.on('engine-status-change', (_, instances) => callback(instances)),
   findFreePort: (startPort: number) => window.electron.ipcRenderer.invoke('find-free-port', startPort),
   
   // Window Controls

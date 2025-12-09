@@ -158,6 +158,10 @@ app.whenReady().then(() => {
     return dbManager.connect(config);
   });
 
+  ipcMain.handle('get-connection-config', async (_, connectionId) => {
+      return dbManager.getConnectionConfig(connectionId);
+  });
+
   ipcMain.handle('list-tables', async (_, connectionId) => {
     return dbManager.listTables(connectionId);
   });
@@ -402,6 +406,10 @@ app.whenReady().then(() => {
   // Subscriptions
   engineController.on('change', (instances) => {
       updateTrayMenu(instances);
+      // Broadcast to renderer
+      if (win) {
+        win.webContents.send('engine-status-change', instances);
+      }
   });
 
   // App Settings Updates

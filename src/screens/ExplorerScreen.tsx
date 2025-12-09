@@ -168,6 +168,46 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>((props
     initDatabaseState();
   }, [connectionId]);
 
+  // Engine Status Monitoring
+  const [engineStatus, setEngineStatus] = useState<'running' | 'stopped' | 'unknown'>('unknown');
+  const [connectionPort, setConnectionPort] = useState<number | null>(null);
+
+  useEffect(() => {
+      // 1. Get Port for this connection
+      ipc.getConnectionConfig(connectionId).then(config => {
+          if (config && config.port) {
+              setConnectionPort(parseInt(config.port, 10));
+              setEngineStatus('running'); // Assume running if we connected
+          }
+      }).catch(err => console.error("Failed to get connection config:", err));
+
+      // 2. Listen for status changes
+      const removeListener = ipc.onEngineStatusChange((instances) => {
+          if (!connectionPort) return;
+          
+          const myInstance = instances.find((i: any) => i.port === connectionPort);
+          if (myInstance) {
+              const newStatus = myInstance.status === 'running' ? 'running' : 'stopped';
+              setEngineStatus(newStatus);
+          } else {
+              // Instance might have been removed or we are not using a managed engine
+              // Keep status as is or 'unknown'
+          }
+      });
+
+      return () => {
+          removeListener();
+      };
+  }, [connectionId, connectionPort]);
+  
+  // Effect to handle engine stop - could also be just render logic
+  useEffect(() => {
+      if (engineStatus === 'stopped') {
+        // Optional: Could clear data or show notification
+        // message.warning("Connection lost: Engine stopped.");
+      }
+  }, [engineStatus]);
+
   // Handle manual refresh
   const handleRefresh = useCallback(() => {
       // Use the ref passed from useBatchEditor or parent
@@ -441,8 +481,36 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>((props
   };
 
   return (
-    <Layout style={{ height: '100%' }}>
+    <Layout style={{ height: '100%', position: 'relative' }}>
       {contextHolder}
+      {engineStatus === 'stopped' && (
+              <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(0,0,0,0.7)',
+                  zIndex: 1000,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  color: 'white',
+                  backdropFilter: 'blur(4px)'
+              }}>
+                  <div style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 16 }}>Engine Stopped</div>
+                  <div style={{ marginBottom: 24, opacity: 0.8 }}>The database engine has been stopped. Please restart it to continue.</div>
+                  <Button type="primary" onClick={() => {
+                      // We can't restart directly from here easily without knowing Engine ID
+                      // But maybe we can just close the tab?
+                      // For now, just a refresh attempt
+                      handleRefresh();
+                  }}>
+                      Try Reconnect
+                  </Button>
+              </div>
+          )}
       <Sider 
         theme="dark" 
         collapsible 
@@ -613,7 +681,7 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>((props
         </div>
       </Sider>
       <Layout>
-        <Content style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: 'var(--background)' }}>
+        <Content style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, background: 'var(--background)', position: 'relative' }}>
           {viewMode === 'sql' ? (
               <SqlEditor connectionId={connectionId} />
           ) : activeTable ? (
