@@ -555,6 +555,13 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>((props
                                     icon: <Edit size={16} />,
                                     label: 'Manage Users',
                                     onClick: () => setIsUserModalVisible(true)
+                                },
+                                {
+                                    key: 'delete-db',
+                                    danger: true,
+                                    icon: <Trash2 size={16} />,
+                                    label: 'Delete Database',
+                                    onClick: () => currentDb && handleDropDatabase(currentDb)
                                 }
                             ]
                         }} 
@@ -586,8 +593,17 @@ const ExplorerScreen = forwardRef<ExplorerScreenRef, ExplorerScreenProps>((props
                                     block 
                                     icon={<Edit size={14} />} 
                                     onClick={() => setIsUserModalVisible(true)}
+                                    style={{ marginBottom: 8 }}
                                 >
                                     Manage Users
+                                </Button>
+                                <Button 
+                                    block 
+                                    danger
+                                    icon={<Trash2 size={14} />} 
+                                    onClick={() => currentDb && handleDropDatabase(currentDb)}
+                                >
+                                    Delete Database
                                 </Button>
                             </div>
                         </>

@@ -22,25 +22,37 @@
 
 ## 📸 Screenshots
 
-### Home Dashboard
-Dashboard overview showing quick access to recent projects and server status.
-![Home Dashboard](screenshots/home.png)
+### Database Manager
+Manage multiple database instances and connection configurations in one place.
+![Database Manager](screenshots/database_manager.png)
 
-### Add Database Engine
-Easily download and install new database engines.
-![Add Database Engine](screenshots/add_new_database_engine.png)
+### Add New Engine
+Easily download and setup new database engines.
+![Add New Engine](screenshots/add_new_engine.png)
 
-### Manage Instances
-Manage multiple database instances with ease.
-![Manage Instances](screenshots/multiple_db_instances.png)
+### Edit Engine Configuration
+Configure port and data directories for your local database instances.
+![Edit Engine Configuration](screenshots/edit_engine_configuration.png)
 
 ### Table Explorer
-Comprehensive table explorer for viewing and editing data.
-![Table Explorer](screenshots/database_tables.png)
+Navigate through your tables and view data with ease.
+![Table Explorer](screenshots/table_explorer.png)
 
-### SQL Editor
-Powerful SQL editor with syntax highlighting and auto-completion.
-![SQL Editor](screenshots/query_editor.png)
+### Modern Data Editor
+Edit data inline with a powerful, modern interface.
+![Modern Data Editor](screenshots/modern_data_editor.png)
+
+### Structure Editor
+Visually modify table schemas and column definitions.
+![Structure Editor](screenshots/edit_table_structure.png)
+
+### Foreign Key Management
+Intuitively manage relationships between tables.
+![Foreign Key Management](screenshots/foreign_key_management.png)
+
+### Built-in SQL Editor
+Execute queries directly with syntax highlighting and auto-completion.
+![SQL Editor](screenshots/build_in_sql_editor.png)
 
 ## 🛠️ Tech Stack
 

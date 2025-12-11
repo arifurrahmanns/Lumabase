@@ -1,24 +1,22 @@
 import React from 'react';
-import { Space, Button, Checkbox, Dropdown, Menu } from 'antd';
+import { Space, Button, Checkbox } from 'antd';
 import { 
     HelpCircle, 
     RefreshCw, 
     Plus, 
     Minus, 
     Square, 
-    X,
-    Menu as MenuIcon
+    X
 } from 'lucide-react';
 import { ipc } from '../renderer/ipc';
 
 interface TitleBarProps {
     onAddTab?: () => void;
     onRefresh?: () => void;
-    onMenuAction?: (action: string) => void;
     refreshDisabled?: boolean;
 }
 
-const TitleBar: React.FC<TitleBarProps> = ({ onAddTab, onRefresh, onMenuAction, refreshDisabled }) => {
+const TitleBar: React.FC<TitleBarProps> = ({ onAddTab, onRefresh, refreshDisabled }) => {
     // const { token } = theme.useToken(); // Unused for now
     const [startOnLogin, setStartOnLogin] = React.useState(false);
     const [showInTray, setShowInTray] = React.useState(true);
@@ -37,11 +35,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ onAddTab, onRefresh, onMenuAction, 
         ipc.setStartOnLogin(newVal);
     };
 
-    const menu = (
-        <Menu onClick={({ key }) => onMenuAction?.(key)}>
-            <Menu.Item key="delete-database" danger>Delete Database</Menu.Item>
-        </Menu>
-    );
+
 
     return (
         <div style={{
@@ -57,12 +51,8 @@ const TitleBar: React.FC<TitleBarProps> = ({ onAddTab, onRefresh, onMenuAction, 
         } as React.CSSProperties}>
             {/* Left Actions */}
             <Space style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-                 <Dropdown overlay={menu} trigger={['click']}>
-                    <Button type="text" size="small" icon={<MenuIcon size={16} />} style={{ color: '#aaa' }}>
-                        Menu
-                    </Button>
-                </Dropdown>
-                <div style={{ width: 1, height: 16, background: '#444', margin: '0 4px' }} />
+
+
                 <Button type="text" size="small" icon={<HelpCircle size={16} />} style={{ color: '#aaa' }} />
                 <Button 
                     type="text" 
