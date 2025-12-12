@@ -14,6 +14,7 @@ interface TitleBarProps {
     onAddTab?: () => void;
     onRefresh?: () => void;
     refreshDisabled?: boolean;
+    onMenuAction?: (action: string) => void;
 }
 
 const TitleBar: React.FC<TitleBarProps> = ({ onAddTab, onRefresh, refreshDisabled }) => {
